@@ -2,7 +2,7 @@
   "name": "pump.fun.bot",
   "scripts": {
     "build": "npx tsc",
-    "run": "node dist/bot.js",
+    "bot": "node dist/bot.js",
     "go": "npm run build && npm run run"
   },
   "dependencies": {
