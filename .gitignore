@@ -1,0 +1,8 @@
+# IDE's
+.idea
+
+# Outputs
+dist
+
+# Deps
+node_modules

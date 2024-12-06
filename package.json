@@ -1,0 +1,17 @@
+{
+  "name": "pump.fun.bot",
+  "scripts": {
+    "build": "npx tsc",
+    "run": "node dist/bot.js",
+    "go": "npm run build && npm run run"
+  },
+  "dependencies": {
+    "nats.ws": "^1.29.2",
+    "ws": "^8.18.0",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.7.2"
+  }
+}
