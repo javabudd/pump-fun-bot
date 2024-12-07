@@ -15,7 +15,6 @@ export default class CoinTrader {
 		console.log(`Initiating sniper for ${this.coin.name} (${this.coin.mint})...`);
 
 		if (this.coin.usd_market_cap <= this.startingMarketCap) {
-			console.log(`Market cap is below limit, buying...`);
 			this.buy();
 		} else {
 			this.disconnect();
@@ -69,6 +68,7 @@ export default class CoinTrader {
 
 		if (trade.usd_market_cap > 10000) {
 			console.log('sell sell sell!!');
+			this.hasPosition = false;
 		}
 	}
 }

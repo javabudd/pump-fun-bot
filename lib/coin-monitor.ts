@@ -86,12 +86,10 @@ export default class CoinMonitor {
 
 	public startCoinMonitor(newToken: Coin): void {
 		if (this.monitoredCoins[newToken.mint]) {
-			console.warn(`Coin ${newToken.name} is already being monitored.`);
 			return;
 		}
 
 		if (Object.keys(this.monitoredCoins).length >= this.maximumMonitoredCoins) {
-			// this.pruneMonitoredCoins();
 			return;
 		}
 
