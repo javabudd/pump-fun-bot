@@ -84,8 +84,9 @@ export type Coin = {
 };
 
 export default class CoinMonitor {
-	private maximumMonitoredCoins = 200;
+	private maximumMonitoredCoins = 75;
 	private monitoredCoins: Record<string, Coin> = {};
+	private trippedMonitoredCoins: Record<string, Trade> = {};
 
 	public startCoinMonitor(newToken: Coin): void {
 		if (this.monitoredCoins[newToken.mint]) {
@@ -104,7 +105,7 @@ export default class CoinMonitor {
 
 		this.subscribeToCoinTrades(newToken);
 
-		// this.pruneMonitoredCoins();
+		this.pruneMonitoredCoins();
 	}
 
 	public stopCoinMonitor(mint: string): void {
@@ -126,12 +127,25 @@ export default class CoinMonitor {
 
 		console.info("Pruning monitored coins...");
 
-		// Sort coins by `monitorStart` timestamp for pruning
-		const sortedMints = monitoredMints.sort((a, b) => {
-			const aDate = new Date(this.monitoredCoins[a].monitorStart).getTime();
-			const bDate = new Date(this.monitoredCoins[b].monitorStart).getTime();
-			return aDate - bDate; // Oldest first
-		});
+		const untrippedMints = monitoredMints.filter(mint => !(mint in this.trippedMonitoredCoins));
+
+		let sortedMints: string[];
+
+		if (untrippedMints.length > 0) {
+			// Sort untripped mints by `monitorStart` timestamp
+			sortedMints = untrippedMints.sort((a, b) => {
+				const aDate = new Date(this.monitoredCoins[a].monitorStart).getTime();
+				const bDate = new Date(this.monitoredCoins[b].monitorStart).getTime();
+				return aDate - bDate; // Oldest first
+			});
+		} else {
+			// All coins are tripped, sort by `monitorStart` timestamp
+			sortedMints = monitoredMints.sort((a, b) => {
+				const aDate = new Date(this.monitoredCoins[a].monitorStart).getTime();
+				const bDate = new Date(this.monitoredCoins[b].monitorStart).getTime();
+				return aDate - bDate; // Oldest first
+			});
+		}
 
 		// Remove excess coins
 		const coinsToRemove = sortedMints.slice(0, monitoredMints.length - this.maximumMonitoredCoins);
@@ -162,10 +176,14 @@ export default class CoinMonitor {
 			const url = `https://pump.fun/coin/${trade.mint}`;
 			if (trade.is_buy) {
 				if (trade.sol_amount > solAmount * 1_000_000_000) {
+					this.trippedMonitoredCoins[trade.mint] = trade;
 					console.log(`Buy ${solAmount} SOL on ${url} by ${trade.user}`);
 				}
 			} else {
 				if (trade.sol_amount > solAmount * 1_000_000_000) {
+					if (trade.mint in this.trippedMonitoredCoins) {
+						delete this.trippedMonitoredCoins[trade.mint];
+					}
 					console.log(`Sell ${solAmount} SOL on ${url} by ${trade.user}`);
 				}
 			}
