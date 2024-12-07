@@ -154,7 +154,7 @@ export default class CoinMonitor {
 	}
 
 	public subscribeToCoinTrades(coin: Coin): void {
-		const trader = new CoinTrader(coin, 10);
+		const trader = new CoinTrader(coin);
 		const socket = io("https://frontend-api.pump.fun", {
 			path: "/socket.io/",
 			transports: ["websocket"],
