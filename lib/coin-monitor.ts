@@ -184,7 +184,7 @@ export default class CoinMonitor {
 					if (trade.mint in this.trippedMonitoredCoins) {
 						delete this.trippedMonitoredCoins[trade.mint];
 					}
-					console.log(`Sell ${solAmount} SOL on ${url} by ${trade.user}`);
+					console.debug(`Sell ${solAmount} SOL on ${url} by ${trade.user}`);
 				}
 			}
 		});
