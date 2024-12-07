@@ -1,9 +1,5 @@
 import {io} from "socket.io-client";
-
-enum TradeType {
-	Buy,
-	Sell
-}
+import CoinTrader from "./coin-trader";
 
 export type Trade = {
 	signature: string;
@@ -90,17 +86,18 @@ export default class CoinMonitor {
 
 	public startCoinMonitor(newToken: Coin): void {
 		if (this.monitoredCoins[newToken.mint]) {
+			console.warn(`Coin ${newToken.name} is already being monitored.`);
 			return;
 		}
 
 		if (Object.keys(this.monitoredCoins).length >= this.maximumMonitoredCoins) {
-			return;
+			console.warn("Maximum monitored coins reached. Pruning before adding new coins...");
+			this.pruneMonitoredCoins();
 		}
 
 		console.info(`Monitoring coin ${newToken.name}`);
 
 		newToken.monitorStart = new Date().toUTCString();
-
 		this.monitoredCoins[newToken.mint] = newToken;
 
 		this.subscribeToCoinTrades(newToken);
@@ -116,6 +113,10 @@ export default class CoinMonitor {
 
 		console.info(`Stopped monitoring coin with mint ${mint}`);
 		delete this.monitoredCoins[mint];
+
+		if (this.trippedMonitoredCoins[mint]) {
+			delete this.trippedMonitoredCoins[mint];
+		}
 	}
 
 	public pruneMonitoredCoins(): void {
@@ -127,28 +128,25 @@ export default class CoinMonitor {
 
 		console.info("Pruning monitored coins...");
 
-		const untrippedMints = monitoredMints.filter(mint => !(mint in this.trippedMonitoredCoins));
+		const untrippedMints = monitoredMints.filter(
+			(mint) => !(mint in this.trippedMonitoredCoins)
+		);
 
-		let sortedMints: string[];
+		let sortedMints: string[] = untrippedMints.length > 0
+			? untrippedMints.sort((a, b) =>
+				new Date(this.monitoredCoins[a].monitorStart).getTime() -
+				new Date(this.monitoredCoins[b].monitorStart).getTime()
+			)
+			: monitoredMints.sort((a, b) =>
+				new Date(this.monitoredCoins[a].monitorStart).getTime() -
+				new Date(this.monitoredCoins[b].monitorStart).getTime()
+			);
 
-		if (untrippedMints.length > 0) {
-			// Sort untripped mints by `monitorStart` timestamp
-			sortedMints = untrippedMints.sort((a, b) => {
-				const aDate = new Date(this.monitoredCoins[a].monitorStart).getTime();
-				const bDate = new Date(this.monitoredCoins[b].monitorStart).getTime();
-				return aDate - bDate; // Oldest first
-			});
-		} else {
-			// All coins are tripped, sort by `monitorStart` timestamp
-			sortedMints = monitoredMints.sort((a, b) => {
-				const aDate = new Date(this.monitoredCoins[a].monitorStart).getTime();
-				const bDate = new Date(this.monitoredCoins[b].monitorStart).getTime();
-				return aDate - bDate; // Oldest first
-			});
-		}
+		const coinsToRemove = sortedMints.slice(
+			0,
+			monitoredMints.length - this.maximumMonitoredCoins
+		);
 
-		// Remove excess coins
-		const coinsToRemove = sortedMints.slice(0, monitoredMints.length - this.maximumMonitoredCoins);
 		for (const mint of coinsToRemove) {
 			console.info(`Pruned coin with mint ${mint}`);
 			delete this.monitoredCoins[mint];
@@ -156,41 +154,44 @@ export default class CoinMonitor {
 	}
 
 	public subscribeToCoinTrades(coin: Coin): void {
-		const socket = io('https://frontend-api.pump.fun', {
-			path: '/socket.io/',
-			transports: ['websocket'],
+		const trader = new CoinTrader(coin, 10);
+		const socket = io("https://frontend-api.pump.fun", {
+			path: "/socket.io/",
+			transports: ["websocket"],
 		});
 
-		socket.on('connect', () => {
-			socket.emit('joinTradeRoom', {mint: coin.mint});
-			console.log(`Joined trade room with mint ${coin.mint}`);
+		socket.on("connect", () => {
+			socket.emit("joinTradeRoom", {mint: coin.mint});
+
+			trader.startSniper();
+
+			console.log(`Joined trade room for mint: ${coin.mint}`);
 		});
 
-		socket.on('disconnect', (reason) => {
-			console.log(`Disconnected: ${reason}`);
-		});
-
-		socket.on('tradeCreated', (data) => {
+		socket.on("tradeCreated", (data) => {
 			const trade: Trade = data;
-			const solAmount = 5;
-			const url = `https://pump.fun/coin/${trade.mint}`;
-			if (trade.is_buy) {
-				if (trade.sol_amount > solAmount * 1_000_000_000) {
-					this.trippedMonitoredCoins[trade.mint] = trade;
-					console.log(`Buy ${solAmount} SOL on ${url} by ${trade.user}`);
-				}
-			} else {
-				if (trade.sol_amount > solAmount * 1_000_000_000) {
-					if (trade.mint in this.trippedMonitoredCoins) {
-						delete this.trippedMonitoredCoins[trade.mint];
-					}
-					console.debug(`Sell ${solAmount} SOL on ${url} by ${trade.user}`);
-				}
-			}
+			this.handleTrade(trader, trade);
 		});
 
-		socket.on('connect_error', (err) => {
-			console.error('Connection error:', err);
+		socket.on("disconnect", (reason) => {
+			console.log(`Disconnected from trade room: ${reason}`);
+			trader.stopSniper();
+		});
+
+		socket.on("connect_error", (err) => {
+			console.error("Socket connection error:", err);
+			trader.stopSniper();
 		});
 	}
+
+	private handleTrade(trader: CoinTrader, trade: Trade): void {
+		trader.addTrade(trade);
+
+		if (trade.is_buy) {
+			this.trippedMonitoredCoins[trade.mint] = trade;
+		} else if (this.trippedMonitoredCoins[trade.mint]) {
+			delete this.trippedMonitoredCoins[trade.mint];
+		}
+	}
 }
+
