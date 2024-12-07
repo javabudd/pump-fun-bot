@@ -80,7 +80,7 @@ export type Coin = {
 };
 
 export default class CoinMonitor {
-	private maximumMonitoredCoins = 75;
+	private maximumMonitoredCoins = 5;
 	private monitoredCoins: Record<string, Coin> = {};
 	private trippedMonitoredCoins: Record<string, Trade> = {};
 
@@ -91,8 +91,8 @@ export default class CoinMonitor {
 		}
 
 		if (Object.keys(this.monitoredCoins).length >= this.maximumMonitoredCoins) {
-			console.warn("Maximum monitored coins reached. Pruning before adding new coins...");
-			this.pruneMonitoredCoins();
+			// this.pruneMonitoredCoins();
+			return;
 		}
 
 		console.info(`Monitoring coin ${newToken.name}`);
@@ -102,7 +102,7 @@ export default class CoinMonitor {
 
 		this.subscribeToCoinTrades(newToken);
 
-		this.pruneMonitoredCoins();
+		// this.pruneMonitoredCoins();
 	}
 
 	public stopCoinMonitor(mint: string): void {
