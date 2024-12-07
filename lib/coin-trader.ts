@@ -35,13 +35,13 @@ export default class CoinTrader {
 	}
 
 	public buy(): void {
-		console.log("Executing buy...");
+		console.log(`Executing buy for ${this.coin.name}...`);
 		this.hasPosition = true;
 		// @TODO SOL buy logic
 	}
 
 	public sell(): void {
-		console.log("Executing sell...");
+		console.log(`Executing sell for ${this.coin.name}...`);
 		// @TODO SOL sell logic
 	}
 
@@ -51,7 +51,7 @@ export default class CoinTrader {
 	}
 
 	private disconnect(): void {
-		console.log("Disconnecting...");
+		console.log(`Disconnecting ${this.coin.name}...`);
 
 		if (this.mintSubscription) {
 			this.mintSubscription.unsubscribe();
@@ -67,7 +67,7 @@ export default class CoinTrader {
 		}
 
 		if (trade.usd_market_cap > 10000) {
-			console.log('sell sell sell!!');
+			console.log(`Selling ${this.coin.name}`);
 			this.hasPosition = false;
 		}
 	}
