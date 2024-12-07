@@ -1,5 +1,6 @@
 import {io} from "socket.io-client";
 import CoinTrader from "./coin-trader";
+import * as os from "node:os";
 
 export type Trade = {
 	signature: string;
@@ -152,7 +153,20 @@ export default class CoinMonitor {
 	}
 
 	public subscribeToCoinTrades(coin: Coin): void {
-		const trader = new CoinTrader(coin);
+		const pumpPrivateKey = process.env['PUMP_PRIVATE_KEY'];
+		const pumpApiKey = process.env['PUMP_API_KEY'];
+
+		if (!pumpPrivateKey || !pumpApiKey) {
+			console.error('Can not subscribe to coin trades without PUMP credentials set')
+			return;
+		}
+
+		const trader = new CoinTrader(
+			coin,
+			pumpPrivateKey,
+			pumpApiKey
+		);
+
 		const socket = io("https://frontend-api.pump.fun", {
 			path: "/socket.io/",
 			transports: ["websocket"],

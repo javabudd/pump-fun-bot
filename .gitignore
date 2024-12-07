@@ -4,5 +4,8 @@
 # Outputs
 dist
 
-# Deps
+# Depss
 node_modules
+
+# Environmenet variables
+.env
