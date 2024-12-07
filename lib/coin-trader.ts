@@ -1,6 +1,8 @@
 import {Coin, Trade} from "./coin-monitor";
 
 export default class CoinTrader {
+	public shouldTerminate = false;
+
 	private mintSubscription: any;
 	private timeoutHandle: any;
 	private trades: Array<Trade> = [];
@@ -69,6 +71,7 @@ export default class CoinTrader {
 		if (trade.usd_market_cap > 10000) {
 			console.log(`Selling ${this.coin.name}`);
 			this.hasPosition = false;
+			this.shouldTerminate = true;
 		}
 	}
 }
