@@ -3,6 +3,8 @@ import {WebSocket} from 'ws';
 import CoinMonitor from "./lib/coin-monitor";
 import {Connection, Keypair, PublicKey,} from '@solana/web3.js';
 
+process.loadEnvFile('.env');
+
 (globalThis as any).WebSocket = WebSocket;
 
 (async function main(): Promise<void> {
@@ -27,11 +29,10 @@ import {Connection, Keypair, PublicKey,} from '@solana/web3.js';
 		console.log('Subscribed to newCoinCreated.prod');
 
 		const connection = new Connection(walletUrl, 'confirmed');
-		const keypair = Keypair.generate();
-		const privateKey = Array.from(keypair.secretKey);
-		const secretKey = Uint8Array.from(privateKey);
-
-		const wallet = Keypair.fromSecretKey(secretKey);
+		const key = process.env.SOL_PRIVATE_KEY ?? '';
+		const privateKeyArray = Uint8Array.from(key.split(',').map(Number));
+		const keypair = Keypair.fromSecretKey(privateKeyArray);
+		const wallet = Keypair.fromSecretKey(keypair.secretKey);
 		const bondingCurveProgram = new PublicKey(bondingCurveId);
 
 		const solanaWallet = {
