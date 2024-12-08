@@ -8,7 +8,13 @@ import {PumpFun} from "./types/pump-fun";
 
 process.loadEnvFile('.env');
 
-(globalThis as any).WebSocket = WebSocket;
+// @ts-expect-error it's global
+(globalThis as unknown).WebSocket = WebSocket;
+
+type GlobalAccount = {
+	feeRecipient: PublicKey;
+	authority: PublicKey;
+}
 
 (async function main(): Promise<void> {
 	const url: string = 'wss://prod-v2.nats.realtime.pump.fun/';
@@ -36,7 +42,7 @@ process.loadEnvFile('.env');
 		{commitment: 'confirmed'}
 	);
 
-	// @ts-ignore
+	// @ts-expect-error ignore idl spec for now
 	const anchorProgram = new Program(idl, bondingCurveId, provider);
 
 	const [globalPDA] = PublicKey.findProgramAddressSync(
@@ -44,7 +50,7 @@ process.loadEnvFile('.env');
 		anchorProgram.programId
 	);
 
-	const globalAccount: any = await anchorProgram.account.global.fetch(globalPDA);
+	const globalAccount = await anchorProgram.account.global.fetch(globalPDA) as unknown as GlobalAccount;
 
 	if (!globalAccount) {
 		console.error('No global account found!');

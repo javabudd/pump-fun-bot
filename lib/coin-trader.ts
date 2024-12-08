@@ -13,9 +13,9 @@ import {PumpFun} from "../types/pump-fun";
 export default class CoinTrader {
 	public shouldTerminate = false;
 
-	private timeoutHandle: any;
 	private trades: Array<Trade> = [];
 	private hasPosition = false;
+	private timeoutHandle?: NodeJS.Timeout;
 
 	private readonly positionAmount = 0.005 * 1_000_000_000;
 	private readonly startingMarketCap = 7000;
@@ -88,7 +88,7 @@ export default class CoinTrader {
 				this.pumpFun.global.pda
 			);
 			console.log("Global account already initialized:", globalAccount);
-		} catch (error) {
+		} catch {
 			console.log("Initializing global account...");
 
 			await this.pumpFun.anchorProgram.methods
