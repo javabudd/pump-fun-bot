@@ -2,6 +2,9 @@ import {connect, NatsConnection, StringCodec, Subscription} from 'nats.ws';
 import {WebSocket} from 'ws';
 import CoinMonitor from "./lib/coin-monitor";
 import {Connection, Keypair, PublicKey,} from '@solana/web3.js';
+import {AnchorProvider, Program, Wallet} from "@project-serum/anchor";
+import idl from './idl.json';
+import {PumpFun} from "./types/pump-fun";
 
 process.loadEnvFile('.env');
 
@@ -13,27 +16,53 @@ process.loadEnvFile('.env');
 	const bondingCurveId = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
 	const sc = StringCodec();
 
-	let solanaWallet;
+	let connection, keypair;
 
 	try {
-		const connection = new Connection(walletUrl, 'confirmed');
+		connection = new Connection(walletUrl, 'confirmed');
 		const key = process.env.SOL_PRIVATE_KEY ?? '';
 		const privateKeyArray = Uint8Array.from(key.split(',').map(Number));
-		const keypair = Keypair.fromSecretKey(privateKeyArray);
-		const wallet = Keypair.fromSecretKey(keypair.secretKey);
-		const bondingCurveProgram = new PublicKey(bondingCurveId);
-
-		solanaWallet = {
-			connection,
-			wallet,
-			bondingCurveProgram
-		};
+		keypair = Keypair.fromSecretKey(privateKeyArray);
 	} catch (err) {
 		console.error('Error loading Solana wallet:', err);
+
 		return;
 	}
 
-	const monitor = new CoinMonitor(solanaWallet);
+	const wallet = new Wallet(keypair);
+	const provider = new AnchorProvider(
+		connection,
+		wallet,
+		{commitment: 'confirmed'}
+	);
+
+	// @ts-ignore
+	const anchorProgram = new Program(idl, bondingCurveId, provider);
+
+	const [globalPDA] = PublicKey.findProgramAddressSync(
+		[Buffer.from("global")],
+		anchorProgram.programId
+	);
+
+	const globalAccount: any = await anchorProgram.account.global.fetch(globalPDA);
+
+	if (!globalAccount) {
+		console.error('No global account found!');
+
+		return;
+	}
+
+	const pumpFun: PumpFun = {
+		global: {
+			feeRecipient: globalAccount.feeRecipient,
+			pda: globalPDA,
+			eventAuthority: globalAccount.authority
+		},
+		keypair,
+		anchorProgram
+	}
+
+	const monitor = new CoinMonitor(pumpFun);
 
 	try {
 		const nc: NatsConnection = await connect({

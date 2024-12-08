@@ -1,7 +1,9 @@
 import {Coin} from "../types/coin";
 import {Trade} from "../types/trade";
-import {PublicKey, sendAndConfirmTransaction, Transaction, TransactionInstruction,} from '@solana/web3.js';
-import {SolanaWallet} from "../types/solanaWallet";
+import {PublicKey, SystemProgram,} from '@solana/web3.js';
+import {BN} from "@project-serum/anchor";
+import {TOKEN_PROGRAM_ID} from '@solana/spl-token';
+import {PumpFun} from "../types/pump-fun";
 
 export default class CoinTrader {
 	public shouldTerminate = false;
@@ -14,10 +16,10 @@ export default class CoinTrader {
 	private readonly startingMarketCap = 7000;
 
 	public constructor(
-		private readonly solanaWallet: SolanaWallet,
+		private readonly pumpFun: PumpFun,
 		private readonly coin: Coin,
 	) {
-		this.solanaWallet = solanaWallet;
+		this.pumpFun = pumpFun;
 		this.coin = coin;
 	}
 
@@ -47,24 +49,71 @@ export default class CoinTrader {
 	public async buy(): Promise<void> {
 		console.log(`Executing buy for ${this.coin.name}...`);
 
-		const amountInLamports = this.positionAmount;
 		const mint = new PublicKey(this.coin.mint);
-		const signature = await this.tradeToken(mint, amountInLamports, true);
-		this.hasPosition = true;
 
-		console.log(`Buy transaction successful: ${signature}`);
+		try {
+			const transaction = await this.pumpFun.anchorProgram.methods.buy(
+				new BN(this.positionAmount),
+				new BN(this.positionAmount + (this.positionAmount * 0.05)),
+			).accounts({
+				global: this.pumpFun.global.pda,
+				user: this.pumpFun.keypair.publicKey,
+				mint,
+				feeRecipient: this.pumpFun.global.feeRecipient,
+				bondingCurve: new PublicKey(this.coin.bonding_curve),
+				associatedBondingCurve: new PublicKey(this.coin.associated_bonding_curve),
+				associatedUser: this.pumpFun.keypair.publicKey,
+				systemProgram: SystemProgram.programId,
+				tokenProgram: TOKEN_PROGRAM_ID,
+				eventAuthority: this.pumpFun.global.eventAuthority,
+				program: this.pumpFun.anchorProgram.programId,
+			})
+				.simulate();
+			// .signers([this.pumpFun.keypair])
+			// .rpc();
+
+			console.log(transaction);
+			console.log(`Buy transaction successful: ${transaction}`);
+			this.hasPosition = true;
+		} catch (error) {
+			console.error('Buy transaction failed:', error);
+		}
 	}
 
 	public async sell(): Promise<void> {
 		console.log(`Executing sell for ${this.coin.name}...`);
 
-		const amountInLamports = this.positionAmount;
 		const mint = new PublicKey(this.coin.mint);
-		const signature = await this.tradeToken(mint, amountInLamports, false);
-		this.hasPosition = false;
-		this.shouldTerminate = true;
 
-		console.log(`Sell transaction successful: ${signature}`);
+		try {
+			const transaction = await this.pumpFun.anchorProgram.methods.sell(
+				new BN(this.positionAmount),
+				new BN(this.positionAmount + (this.positionAmount * 0.05)),
+			)
+				.accounts({
+					global: this.pumpFun.global.pda,
+					user: this.pumpFun.keypair.publicKey,
+					mint,
+					feeRecipient: this.pumpFun.global.feeRecipient,
+					bondingCurve: new PublicKey(this.coin.bonding_curve),
+					associatedBondingCurve: new PublicKey(this.coin.associated_bonding_curve),
+					systemProgram: SystemProgram.programId,
+					tokenProgram: TOKEN_PROGRAM_ID,
+					eventAuthority: this.pumpFun.global.eventAuthority,
+					program: this.pumpFun.anchorProgram.programId,
+				})
+				.simulate();
+			// .signers([this.pumpFun.keypair])
+			// .rpc();
+
+			console.log(transaction);
+			console.log(`Sell transaction successful: ${transaction}`);
+
+			this.hasPosition = false;
+			this.shouldTerminate = true;
+		} catch (error) {
+			console.error('Sell transaction failed:', error);
+		}
 	}
 
 	public async addTrade(trade: Trade): Promise<void> {
@@ -88,48 +137,6 @@ export default class CoinTrader {
 
 		if (trade.usd_market_cap > 10000) {
 			await this.sell();
-		}
-	}
-
-	private async tradeToken(
-		mint: PublicKey,
-		amount: number,
-		isBuy: boolean
-	): Promise<string> {
-		try {
-			const transaction = new Transaction();
-			const amountBytes = Array.from(BigInt(amount).toString().split('').map(Number));
-			const instructionData = Buffer.from(
-				Uint8Array.of(isBuy ? 1 : 0, ...amountBytes)
-			);
-
-			// @ts-ignore
-			const instruction = new TransactionInstruction({
-				keys: [
-					{
-						pubkey: this.solanaWallet.wallet.publicKey,
-						isSigner: true,
-						isWritable: true
-					},
-					{
-						pubkey: mint,
-						isSigner: false,
-						isWritable: true
-					}
-				],
-				programId: this.solanaWallet.bondingCurveProgram,
-				data: instructionData,
-			});
-
-			transaction.add(instruction);
-
-			return await sendAndConfirmTransaction(
-				this.solanaWallet.connection,
-				transaction, [this.solanaWallet.wallet]
-			);
-		} catch (error) {
-			console.error('Error during trade:', error);
-			throw error;
 		}
 	}
 }

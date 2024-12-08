@@ -2,7 +2,7 @@ import {io} from "socket.io-client";
 import CoinTrader from "./coin-trader";
 import {Coin} from "../types/coin";
 import {Trade} from "../types/trade";
-import {SolanaWallet} from "../types/solanaWallet";
+import {PumpFun} from "../types/pump-fun";
 
 export default class CoinMonitor {
 	private readonly pumpFunSocketIoUrl = 'https://frontend-api.pump.fun';
@@ -11,8 +11,8 @@ export default class CoinMonitor {
 	private monitoredCoins: Record<string, Coin> = {};
 	private trippedMonitoredCoins: Record<string, Trade> = {};
 
-	public constructor(private readonly solanaWallet: SolanaWallet) {
-		this.solanaWallet = solanaWallet;
+	public constructor(private readonly pumpFun: PumpFun) {
+		this.pumpFun = pumpFun;
 	}
 
 	public startCoinMonitor(newToken: Coin): void {
@@ -33,7 +33,7 @@ export default class CoinMonitor {
 	}
 
 	public subscribeToCoinTrades(coin: Coin): void {
-		const trader = new CoinTrader(this.solanaWallet, coin,);
+		const trader = new CoinTrader(this.pumpFun, coin);
 
 		const socket = io(
 			this.pumpFunSocketIoUrl,

@@ -5,6 +5,7 @@
     "strict": true,
     "esModuleInterop": true,
     "outDir": "./dist",
+    "resolveJsonModule": true,
     "lib": [
       "ES2023",
       "DOM"
