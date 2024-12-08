@@ -2,7 +2,7 @@
 
 ## Requirements
 
-* node==20
+* node==22
 * npm
 
 ## Building

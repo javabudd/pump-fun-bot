@@ -5,6 +5,9 @@
     "bot": "node dist/bot.js",
     "go": "npm run build && npm run run"
   },
+  "engines": {
+    "node": ">=22 <23"
+  },
   "dependencies": {
     "axios": "^1.7.9",
     "nats.ws": "^1.29.2",
