@@ -23,7 +23,7 @@ export default class CoinTrader {
   private timeoutHandle?: NodeJS.Timeout;
   private isPlacingSale = false;
 
-  private readonly positionAmount = 1000 * 1_000_000_000; // 1 million
+  private readonly positionAmount = 500 * 1_000_000_000; // 1 million
   private readonly startingMarketCap = 7000;
   private readonly pumpFunAuthority =
     "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
@@ -191,12 +191,20 @@ export default class CoinTrader {
       false,
     );
 
+    const expectedSolOutput = await this.getExpectedSolOutput(
+      this.positionAmount,
+    );
+
+    // Calculate minSolOutput using BN arithmetic
+    const slippageMultiplier = new BN(10000 - slippageTolerance * 10000).div(
+      new BN(10000),
+    );
+
+    const minSolOutput = expectedSolOutput.mul(slippageMultiplier);
+
     try {
       const transaction = await this.pumpFun.anchorProgram.methods
-        .sell(
-          new BN(this.positionAmount),
-          new BN(this.positionAmount - this.positionAmount * slippageTolerance),
-        )
+        .sell(new BN(this.positionAmount), new BN(minSolOutput))
         .accounts({
           global: this.pumpFun.global.pda,
           user: this.pumpFun.keypair.publicKey,
@@ -285,5 +293,54 @@ export default class CoinTrader {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async getExpectedSolOutput(amount: number): Promise<BN> {
+    const bondingCurveAddress = new PublicKey(this.coin.bonding_curve);
+
+    // Fetch bonding curve account data
+    const bondingCurveInfo =
+      await this.pumpFun.connection.getAccountInfo(bondingCurveAddress);
+
+    if (!bondingCurveInfo) {
+      throw new Error("Failed to fetch bonding curve information");
+    }
+
+    // Parse the bonding curve data
+    const bondingCurveData = this.parseBondingCurve(bondingCurveInfo.data);
+
+    const { virtualTokenReserves, virtualSolReserves, feeBasisPoints } =
+      bondingCurveData;
+
+    // Convert inputs to BN
+    const amountBN = new BN(amount);
+
+    // Fee multiplier as a BN (10000 - feeBasisPoints) / 10000
+    const feeMultiplier = new BN(10000).sub(feeBasisPoints).div(new BN(10000));
+
+    // Calculate expected SOL output using BN arithmetic
+    const expectedSolOutput = amountBN
+      .mul(virtualSolReserves)
+      .div(virtualTokenReserves.add(amountBN))
+      .mul(feeMultiplier);
+
+    console.log(
+      `Calculated expected SOL output: ${expectedSolOutput.toString()}, using virtualTokenReserves: ${virtualTokenReserves.toString()}, virtualSolReserves: ${virtualSolReserves.toString()}, feeMultiplier: ${feeMultiplier.toString()}`,
+    );
+
+    return expectedSolOutput;
+  }
+
+  private parseBondingCurve(data: Buffer): {
+    virtualTokenReserves: BN;
+    virtualSolReserves: BN;
+    feeBasisPoints: BN;
+  } {
+    // Parse the bonding curve data and return BN values
+    const virtualTokenReserves = new BN(data.slice(0, 8), "le"); // u64
+    const virtualSolReserves = new BN(data.slice(8, 16), "le"); // u64
+    const feeBasisPoints = new BN(data.slice(16, 20), "le"); // u32
+
+    return { virtualTokenReserves, virtualSolReserves, feeBasisPoints };
   }
 }
