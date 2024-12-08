@@ -69,7 +69,7 @@ export default class CoinTrader {
 				this.pumpFun.keypair.publicKey,
 				mint,
 				TOKEN_PROGRAM_ID,
-				ASSOCIATED_TOKEN_PROGRAM_ID
+				ASSOCIATED_TOKEN_PROGRAM_ID,
 			)
 		);
 
