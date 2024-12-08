@@ -33,6 +33,8 @@ process.loadEnvFile('.env');
 		return;
 	}
 
+	const monitor = new CoinMonitor(solanaWallet);
+
 	try {
 		const nc: NatsConnection = await connect({
 			servers: url,
@@ -50,7 +52,6 @@ process.loadEnvFile('.env');
 
 		for await (const msg of sub) {
 			const coin = JSON.parse(sc.decode(msg.data));
-			const monitor = new CoinMonitor(solanaWallet);
 
 			monitor.startCoinMonitor(coin);
 		}
