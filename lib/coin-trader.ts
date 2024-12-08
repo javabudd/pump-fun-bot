@@ -1,6 +1,6 @@
 import {Coin} from "../types/coin";
 import {Trade} from "../types/trade";
-import {PublicKey, SystemProgram, Transaction} from '@solana/web3.js';
+import {PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction} from '@solana/web3.js';
 import {BN} from "@project-serum/anchor";
 import {
 	ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -62,43 +62,80 @@ export default class CoinTrader {
 			false
 		);
 
-		const transaction = new Transaction().add(
-			createAssociatedTokenAccountInstruction(
-				this.pumpFun.keypair.publicKey,
-				associatedUserAddress,
-				this.pumpFun.keypair.publicKey,
-				mint,
-				TOKEN_PROGRAM_ID,
-				ASSOCIATED_TOKEN_PROGRAM_ID,
-			)
-		);
+		const ataInfo = await this.pumpFun.connection.getAccountInfo(associatedUserAddress);
+		if (!ataInfo) {
+			console.log("Creating associated token account...");
 
-		await this.pumpFun.connection.sendTransaction(transaction, [this.pumpFun.keypair]);
+			const transaction = new Transaction().add(
+				createAssociatedTokenAccountInstruction(
+					this.pumpFun.keypair.publicKey,
+					associatedUserAddress,
+					this.pumpFun.keypair.publicKey,
+					mint,
+					TOKEN_PROGRAM_ID,
+					ASSOCIATED_TOKEN_PROGRAM_ID
+				)
+			);
 
-		console.log("Associated token account created:", associatedUserAddress.toBase58());
+			await this.pumpFun.connection.sendTransaction(transaction, [this.pumpFun.keypair]);
+			console.log("Associated token account created:", associatedUserAddress.toBase58());
+		} else {
+			console.log("Associated token account already exists:", associatedUserAddress.toBase58());
+		}
 
 		try {
-			const transaction = await this.pumpFun.anchorProgram.methods.buy(
-				new BN(this.positionAmount),
-				new BN(this.positionAmount + (this.positionAmount * 0.05)),
-			).accounts({
-				global: this.pumpFun.global.pda,
-				user: this.pumpFun.keypair.publicKey,
-				mint,
-				feeRecipient: this.pumpFun.global.feeRecipient,
-				bondingCurve: new PublicKey(this.coin.bonding_curve),
-				associatedBondingCurve: new PublicKey(this.coin.associated_bonding_curve),
-				associatedUser: associatedUserAddress,
-				systemProgram: SystemProgram.programId,
-				tokenProgram: TOKEN_PROGRAM_ID,
-				eventAuthority: this.pumpFun.global.eventAuthority,
-				program: this.pumpFun.anchorProgram.programId,
-			})
-				// .simulate();
+			const globalAccount = await this.pumpFun.anchorProgram.account.global.fetch(
+				this.pumpFun.global.pda
+			);
+			console.log("Global account already initialized:", globalAccount);
+		} catch (error) {
+			console.log("Initializing global account...");
+
+			await this.pumpFun.anchorProgram.methods
+				.initialize()
+				.accounts({
+					global: this.pumpFun.global.pda,
+					user: this.pumpFun.keypair.publicKey,
+					systemProgram: SystemProgram.programId,
+				})
 				.signers([this.pumpFun.keypair])
 				.rpc();
 
-			console.log(transaction);
+			console.log("Global account initialized.");
+		}
+
+		await this.ensureAtaInitialized(associatedUserAddress);
+
+		const [expectedEventAuthority] = PublicKey.findProgramAddressSync(
+			[Buffer.from("event_authority_seed"), this.pumpFun.keypair.publicKey.toBuffer()],
+			this.pumpFun.anchorProgram.programId
+		);
+
+		try {
+			console.log("Executing buy transaction...");
+
+			const transaction = await this.pumpFun.anchorProgram.methods
+				.buy(
+					new BN(this.positionAmount),
+					new BN(this.positionAmount + this.positionAmount * 0.05) // Max SOL cost with 5% slippage
+				)
+				.accounts({
+					global: this.pumpFun.global.pda,
+					user: this.pumpFun.keypair.publicKey,
+					mint,
+					feeRecipient: this.pumpFun.global.feeRecipient,
+					bondingCurve: new PublicKey(this.coin.bonding_curve),
+					associatedBondingCurve: new PublicKey(this.coin.associated_bonding_curve),
+					associatedUser: associatedUserAddress,
+					rent: SYSVAR_RENT_PUBKEY,
+					systemProgram: SystemProgram.programId,
+					tokenProgram: TOKEN_PROGRAM_ID,
+					eventAuthority: expectedEventAuthority,
+					program: this.pumpFun.anchorProgram.programId,
+				})
+				.signers([this.pumpFun.keypair])
+				.rpc();
+
 			console.log(`Buy transaction successful: ${transaction}`);
 			this.hasPosition = true;
 		} catch (error) {
@@ -117,6 +154,11 @@ export default class CoinTrader {
 			false
 		);
 
+		const [expectedEventAuthority] = PublicKey.findProgramAddressSync(
+			[Buffer.from("event_authority_seed"), this.pumpFun.keypair.publicKey.toBuffer()],
+			this.pumpFun.anchorProgram.programId
+		);
+
 		try {
 			const transaction = await this.pumpFun.anchorProgram.methods.sell(
 				new BN(this.positionAmount),
@@ -130,12 +172,12 @@ export default class CoinTrader {
 					bondingCurve: new PublicKey(this.coin.bonding_curve),
 					associatedBondingCurve: new PublicKey(this.coin.associated_bonding_curve),
 					associatedUser: associatedUserAddress,
+					rent: SYSVAR_RENT_PUBKEY,
 					systemProgram: SystemProgram.programId,
 					tokenProgram: TOKEN_PROGRAM_ID,
-					eventAuthority: this.pumpFun.global.eventAuthority,
+					eventAuthority: expectedEventAuthority,
 					program: this.pumpFun.anchorProgram.programId,
 				})
-				// .simulate();
 				.signers([this.pumpFun.keypair])
 				.rpc();
 
@@ -171,5 +213,25 @@ export default class CoinTrader {
 		if (trade.usd_market_cap > 10000) {
 			await this.sell();
 		}
+	}
+
+	private async ensureAtaInitialized(
+		associatedUserAddress: PublicKey,
+		maxAttempts = 7
+	): Promise<void> {
+		for (let attempt = 0; attempt < maxAttempts; attempt++) {
+			const ataInfo = await this.pumpFun.connection.getAccountInfo(associatedUserAddress);
+			if (ataInfo) {
+				return;
+			}
+
+			console.log(`Retrying ATA creation (${attempt + 1}/${maxAttempts})...`);
+			await this.sleep(1000);
+		}
+		throw new Error("ATA initialization failed after retries.");
+	}
+
+	private sleep(ms: number): Promise<void> {
+		return new Promise(resolve => setTimeout(resolve, ms));
 	}
 }
