@@ -23,7 +23,7 @@ export default class CoinTrader {
   private timeoutHandle?: NodeJS.Timeout;
   private isPlacingSale = false;
 
-  private readonly positionAmount = 1000 * 1_000_000_000; // 1 million
+  private readonly positionAmount = 500 * 1_000_000_000; // 1 million
   private readonly startingMarketCap = 7000;
   private readonly pumpFunAuthority =
     "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
@@ -195,7 +195,7 @@ export default class CoinTrader {
       const transaction = await this.pumpFun.anchorProgram.methods
         .sell(
           new BN(this.positionAmount),
-          new BN(this.positionAmount + this.positionAmount * slippageTolerance),
+          new BN(this.positionAmount - this.positionAmount * slippageTolerance),
         )
         .accounts({
           global: this.pumpFun.global.pda,
