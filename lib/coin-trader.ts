@@ -22,8 +22,10 @@ export default class CoinTrader {
   private hasPosition = false;
   private timeoutHandle?: NodeJS.Timeout;
 
-  private readonly positionAmount = 0.005 * 1_000_000_000;
+  private readonly positionAmount = 100 * 1_000_000_000; // 1 million
   private readonly startingMarketCap = 7000;
+  private readonly pumpFunAuthority =
+    "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
 
   public constructor(
     private readonly pumpFun: PumpFun,
@@ -110,7 +112,7 @@ export default class CoinTrader {
         await this.pumpFun.anchorProgram.account.global.fetch(
           this.pumpFun.global.pda,
         );
-      console.log("Global account already initialized:", globalAccount);
+      console.debug("Global account already initialized:", globalAccount);
     } catch {
       console.log("Initializing global account...");
 
@@ -128,14 +130,6 @@ export default class CoinTrader {
     }
 
     await this.ensureAtaInitialized(associatedUserAddress);
-
-    const [expectedEventAuthority] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("event_authority_seed"),
-        this.pumpFun.keypair.publicKey.toBuffer(),
-      ],
-      this.pumpFun.anchorProgram.programId,
-    );
 
     try {
       console.log("Executing buy transaction...");
@@ -158,7 +152,7 @@ export default class CoinTrader {
           rent: SYSVAR_RENT_PUBKEY,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
-          eventAuthority: expectedEventAuthority,
+          eventAuthority: new PublicKey(this.pumpFunAuthority),
           program: this.pumpFun.anchorProgram.programId,
         })
         .signers([this.pumpFun.keypair])
@@ -182,19 +176,11 @@ export default class CoinTrader {
       false,
     );
 
-    const [expectedEventAuthority] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("event_authority_seed"),
-        this.pumpFun.keypair.publicKey.toBuffer(),
-      ],
-      this.pumpFun.anchorProgram.programId,
-    );
-
     try {
       const transaction = await this.pumpFun.anchorProgram.methods
         .sell(
           new BN(this.positionAmount),
-          new BN(this.positionAmount + this.positionAmount * 0.05),
+          new BN(this.positionAmount + this.positionAmount * 0.25),
         )
         .accounts({
           global: this.pumpFun.global.pda,
@@ -209,7 +195,7 @@ export default class CoinTrader {
           rent: SYSVAR_RENT_PUBKEY,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
-          eventAuthority: expectedEventAuthority,
+          eventAuthority: new PublicKey(this.pumpFunAuthority),
           program: this.pumpFun.anchorProgram.programId,
         })
         .signers([this.pumpFun.keypair])
