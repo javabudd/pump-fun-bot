@@ -30,9 +30,6 @@ process.loadEnvFile('.env');
 		};
 	} catch (err) {
 		console.error(err);
-	}
-
-	if (solanaWallet === undefined) {
 		return;
 	}
 
