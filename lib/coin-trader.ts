@@ -1,8 +1,13 @@
 import {Coin} from "../types/coin";
 import {Trade} from "../types/trade";
-import {PublicKey, SystemProgram,} from '@solana/web3.js';
+import {PublicKey, SystemProgram, Transaction} from '@solana/web3.js';
 import {BN} from "@project-serum/anchor";
-import {TOKEN_PROGRAM_ID} from '@solana/spl-token';
+import {
+	ASSOCIATED_TOKEN_PROGRAM_ID,
+	createAssociatedTokenAccountInstruction,
+	getAssociatedTokenAddressSync,
+	TOKEN_PROGRAM_ID
+} from '@solana/spl-token';
 import {PumpFun} from "../types/pump-fun";
 
 export default class CoinTrader {
@@ -51,6 +56,27 @@ export default class CoinTrader {
 
 		const mint = new PublicKey(this.coin.mint);
 
+		const associatedUserAddress = getAssociatedTokenAddressSync(
+			mint,
+			this.pumpFun.keypair.publicKey,
+			false
+		);
+
+		const transaction = new Transaction().add(
+			createAssociatedTokenAccountInstruction(
+				this.pumpFun.keypair.publicKey,
+				associatedUserAddress,
+				this.pumpFun.keypair.publicKey,
+				mint,
+				TOKEN_PROGRAM_ID,
+				ASSOCIATED_TOKEN_PROGRAM_ID
+			)
+		);
+
+		await this.pumpFun.connection.sendTransaction(transaction, [this.pumpFun.keypair]);
+
+		console.log("Associated token account created:", associatedUserAddress.toBase58());
+
 		try {
 			const transaction = await this.pumpFun.anchorProgram.methods.buy(
 				new BN(this.positionAmount),
@@ -62,15 +88,15 @@ export default class CoinTrader {
 				feeRecipient: this.pumpFun.global.feeRecipient,
 				bondingCurve: new PublicKey(this.coin.bonding_curve),
 				associatedBondingCurve: new PublicKey(this.coin.associated_bonding_curve),
-				associatedUser: this.pumpFun.keypair.publicKey,
+				associatedUser: associatedUserAddress,
 				systemProgram: SystemProgram.programId,
 				tokenProgram: TOKEN_PROGRAM_ID,
 				eventAuthority: this.pumpFun.global.eventAuthority,
 				program: this.pumpFun.anchorProgram.programId,
 			})
-				.simulate();
-			// .signers([this.pumpFun.keypair])
-			// .rpc();
+				// .simulate();
+				.signers([this.pumpFun.keypair])
+				.rpc();
 
 			console.log(transaction);
 			console.log(`Buy transaction successful: ${transaction}`);
@@ -85,6 +111,12 @@ export default class CoinTrader {
 
 		const mint = new PublicKey(this.coin.mint);
 
+		const associatedUserAddress = getAssociatedTokenAddressSync(
+			mint,
+			this.pumpFun.keypair.publicKey,
+			false
+		);
+
 		try {
 			const transaction = await this.pumpFun.anchorProgram.methods.sell(
 				new BN(this.positionAmount),
@@ -97,14 +129,15 @@ export default class CoinTrader {
 					feeRecipient: this.pumpFun.global.feeRecipient,
 					bondingCurve: new PublicKey(this.coin.bonding_curve),
 					associatedBondingCurve: new PublicKey(this.coin.associated_bonding_curve),
+					associatedUser: associatedUserAddress,
 					systemProgram: SystemProgram.programId,
 					tokenProgram: TOKEN_PROGRAM_ID,
 					eventAuthority: this.pumpFun.global.eventAuthority,
 					program: this.pumpFun.anchorProgram.programId,
 				})
-				.simulate();
-			// .signers([this.pumpFun.keypair])
-			// .rpc();
+				// .simulate();
+				.signers([this.pumpFun.keypair])
+				.rpc();
 
 			console.log(transaction);
 			console.log(`Sell transaction successful: ${transaction}`);

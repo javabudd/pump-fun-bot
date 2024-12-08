@@ -58,6 +58,7 @@ process.loadEnvFile('.env');
 			pda: globalPDA,
 			eventAuthority: globalAccount.authority
 		},
+		connection,
 		keypair,
 		anchorProgram
 	}
