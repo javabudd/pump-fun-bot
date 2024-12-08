@@ -29,7 +29,7 @@ process.loadEnvFile('.env');
 			bondingCurveProgram
 		};
 	} catch (err) {
-		console.error(err);
+		console.error('Error loading Solana wallet:', err);
 		return;
 	}
 
