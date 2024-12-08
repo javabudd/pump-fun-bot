@@ -49,53 +49,51 @@ export default class CoinTrader {
 	public async buy(): Promise<void> {
 		console.log(`Executing buy for ${this.coin.name}...`);
 
-		try {
-			const response = await axios.post(
-				this.apiUrl,
-				{
-					trade_type: 'buy',
-					mint: this.coin.mint,
-					amount: this.positionAmount,
-					slippage: 25,
-					userPrivateKey: this.pumpPrivateKey,
+		return await axios.post(
+			this.apiUrl,
+			{
+				trade_type: 'buy',
+				mint: this.coin.mint,
+				amount: this.positionAmount,
+				slippage: 25,
+				userPrivateKey: this.pumpPrivateKey,
+			},
+			{
+				headers: {
+					'Authorization': `Bearer ${this.pumpApiKey}`,
 				},
-				{
-					headers: {
-						'Authorization': `Bearer ${this.pumpApiKey}`,
-					},
-				}
-			);
+			}
+		).then((response) => {
 			console.log('Buy response:', response.data);
 			this.hasPosition = true;
-		} catch (error) {
-			console.error('Buy error:', error);
-		}
+		}).catch((error) => {
+			console.error('Buy error:', error.message);
+		});
 	}
 
 	public async sell(): Promise<void> {
 		console.log(`Executing sell for ${this.coin.name}...`);
 
-		try {
-			const response = await axios.post(
-				this.apiUrl,
-				{
-					trade_type: 'sell',
-					mint: this.coin.mint,
-					amount: this.positionAmount,
-					slippage: 25,
-					userPrivateKey: this.pumpPrivateKey,
+		return axios.post(
+			this.apiUrl,
+			{
+				trade_type: 'sell',
+				mint: this.coin.mint,
+				amount: this.positionAmount,
+				slippage: 25,
+				userPrivateKey: this.pumpPrivateKey,
+			},
+			{
+				headers: {
+					'Authorization': `Bearer ${this.pumpApiKey}`,
 				},
-				{
-					headers: {
-						'Authorization': `Bearer ${this.pumpApiKey}`,
-					},
-				}
-			);
+			}
+		).then((response) => {
 			console.log('Sell response:', response.data);
 			this.hasPosition = false;
-		} catch (error) {
-			console.error('Sell error:', error);
-		}
+		}).catch((error) => {
+			console.error('Sell error:', error.message);
+		});
 	}
 
 	public async addTrade(trade: Trade): Promise<void> {
