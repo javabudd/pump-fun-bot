@@ -21,6 +21,7 @@ export default class CoinTrader {
   private trades: Array<Trade> = [];
   private hasPosition = false;
   private timeoutHandle?: NodeJS.Timeout;
+  private isPlacingSale = false;
 
   private readonly positionAmount = 1000 * 1_000_000_000; // 1 million
   private readonly startingMarketCap = 7000;
@@ -166,6 +167,12 @@ export default class CoinTrader {
   }
 
   public async sell(): Promise<void> {
+    if (this.isPlacingSale) {
+      return;
+    }
+
+    this.isPlacingSale = true;
+
     console.log(`Executing sell for ${this.coin.name}...`);
 
     const mint = new PublicKey(this.coin.mint);
@@ -206,8 +213,10 @@ export default class CoinTrader {
 
       this.hasPosition = false;
       this.shouldTerminate = true;
+      this.isPlacingSale = false;
     } catch (error) {
       console.error("Sell transaction failed:", error);
+      this.isPlacingSale = false;
     }
   }
 
