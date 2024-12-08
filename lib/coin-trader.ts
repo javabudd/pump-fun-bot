@@ -91,6 +91,7 @@ export default class CoinTrader {
 		).then((response) => {
 			console.log('Sell response:', response.data);
 			this.hasPosition = false;
+			this.shouldTerminate = true;
 		}).catch((error) => {
 			console.error('Sell error:', error.message);
 		});
@@ -117,7 +118,6 @@ export default class CoinTrader {
 
 		if (trade.usd_market_cap > 10000) {
 			await this.sell();
-			this.shouldTerminate = true;
 		}
 	}
 }
