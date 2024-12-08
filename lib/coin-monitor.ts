@@ -2,13 +2,18 @@ import {io} from "socket.io-client";
 import CoinTrader from "./coin-trader";
 import {Coin} from "../types/coin";
 import {Trade} from "../types/trade";
+import {SolanaWallet} from "../types/solanaWallet";
 
 export default class CoinMonitor {
 	private readonly pumpFunSocketIoUrl = 'https://frontend-api.pump.fun';
 
-	private maximumMonitoredCoins = 5;
+	private maximumMonitoredCoins = 1;
 	private monitoredCoins: Record<string, Coin> = {};
 	private trippedMonitoredCoins: Record<string, Trade> = {};
+
+	public constructor(private readonly solanaWallet: SolanaWallet) {
+		this.solanaWallet = solanaWallet;
+	}
 
 	public startCoinMonitor(newToken: Coin): void {
 		if (this.monitoredCoins[newToken.mint]) {
@@ -32,6 +37,7 @@ export default class CoinMonitor {
 		const pumpApiKey = process.env['PUMP_API_KEY'] ?? 'bar';
 
 		const trader = new CoinTrader(
+			this.solanaWallet,
 			coin,
 			pumpPrivateKey,
 			pumpApiKey

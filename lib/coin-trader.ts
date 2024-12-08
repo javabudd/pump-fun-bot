@@ -1,6 +1,7 @@
-import axios from 'axios';
 import {Coin} from "../types/coin";
 import {Trade} from "../types/trade";
+import {PublicKey, sendAndConfirmTransaction, Transaction, TransactionInstruction,} from '@solana/web3.js';
+import {SolanaWallet} from "../types/solanaWallet";
 
 export default class CoinTrader {
 	public shouldTerminate = false;
@@ -8,16 +9,18 @@ export default class CoinTrader {
 	private timeoutHandle: any;
 	private trades: Array<Trade> = [];
 	private hasPosition = false;
-	private apiUrl = 'https://pumpapi.fun/api/trade';
 
 	private readonly positionAmount = 0.005;
 	private readonly startingMarketCap = 7000;
+	private readonly oneSolana = 1 * 1_000_000_000;
 
-	constructor(
+	public constructor(
+		private readonly solanaWallet: SolanaWallet,
 		private readonly coin: Coin,
 		private readonly pumpApiKey: string,
 		private readonly pumpPrivateKey: string
 	) {
+		this.solanaWallet = solanaWallet;
 		this.coin = coin;
 		this.pumpApiKey = pumpApiKey;
 		this.pumpPrivateKey = pumpPrivateKey;
@@ -49,52 +52,24 @@ export default class CoinTrader {
 	public async buy(): Promise<void> {
 		console.log(`Executing buy for ${this.coin.name}...`);
 
-		return await axios.post(
-			this.apiUrl,
-			{
-				trade_type: 'buy',
-				mint: this.coin.mint,
-				amount: this.positionAmount,
-				slippage: 25,
-				userPrivateKey: this.pumpPrivateKey,
-			},
-			{
-				headers: {
-					'Authorization': `Bearer ${this.pumpApiKey}`,
-				},
-			}
-		).then((response) => {
-			console.log('Buy response:', response.data);
-			this.hasPosition = true;
-		}).catch((error) => {
-			console.error('Buy error:', error.message);
-		});
+		const amountInLamports = this.oneSolana;
+		const mint = new PublicKey(this.coin.mint);
+		const signature = await this.tradeToken(mint, amountInLamports, true);
+		this.hasPosition = true;
+
+		console.log(`Buy transaction successful: ${signature}`);
 	}
 
 	public async sell(): Promise<void> {
 		console.log(`Executing sell for ${this.coin.name}...`);
 
-		return axios.post(
-			this.apiUrl,
-			{
-				trade_type: 'sell',
-				mint: this.coin.mint,
-				amount: this.positionAmount,
-				slippage: 25,
-				userPrivateKey: this.pumpPrivateKey,
-			},
-			{
-				headers: {
-					'Authorization': `Bearer ${this.pumpApiKey}`,
-				},
-			}
-		).then((response) => {
-			console.log('Sell response:', response.data);
-			this.hasPosition = false;
-			this.shouldTerminate = true;
-		}).catch((error) => {
-			console.error('Sell error:', error.message);
-		});
+		const amountInLamports = this.oneSolana;
+		const mint = new PublicKey(this.coin.mint);
+		const signature = await this.tradeToken(mint, amountInLamports, false);
+		this.hasPosition = false;
+		this.shouldTerminate = true;
+
+		console.log(`Sell transaction successful: ${signature}`);
 	}
 
 	public async addTrade(trade: Trade): Promise<void> {
@@ -118,6 +93,48 @@ export default class CoinTrader {
 
 		if (trade.usd_market_cap > 10000) {
 			await this.sell();
+		}
+	}
+
+	private async tradeToken(
+		mint: PublicKey,
+		amount: number,
+		isBuy: boolean
+	): Promise<string> {
+		try {
+			const transaction = new Transaction();
+			const amountBytes = Array.from(BigInt(amount).toString().split('').map(Number));
+			const instructionData = Buffer.from(
+				Uint8Array.of(isBuy ? 1 : 0, ...amountBytes)
+			);
+
+			// @ts-ignore
+			const instruction = new TransactionInstruction({
+				keys: [
+					{
+						pubkey: this.solanaWallet.wallet.publicKey,
+						isSigner: true,
+						isWritable: true
+					},
+					{
+						pubkey: mint,
+						isSigner: false,
+						isWritable: true
+					}
+				],
+				programId: this.solanaWallet.bondingCurveProgram,
+				data: instructionData,
+			});
+
+			transaction.add(instruction);
+
+			return await sendAndConfirmTransaction(
+				this.solanaWallet.connection,
+				transaction, [this.solanaWallet.wallet]
+			);
+		} catch (error) {
+			console.error('Error during trade:', error);
+			throw error;
 		}
 	}
 }
