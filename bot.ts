@@ -13,6 +13,29 @@ process.loadEnvFile('.env');
 	const bondingCurveId = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
 	const sc = StringCodec();
 
+	let solanaWallet;
+
+	try {
+		const connection = new Connection(walletUrl, 'confirmed');
+		const key = process.env.SOL_PRIVATE_KEY ?? '';
+		const privateKeyArray = Uint8Array.from(key.split(',').map(Number));
+		const keypair = Keypair.fromSecretKey(privateKeyArray);
+		const wallet = Keypair.fromSecretKey(keypair.secretKey);
+		const bondingCurveProgram = new PublicKey(bondingCurveId);
+
+		solanaWallet = {
+			connection,
+			wallet,
+			bondingCurveProgram
+		};
+	} catch (err) {
+		console.error(err);
+	}
+
+	if (solanaWallet === undefined) {
+		return;
+	}
+
 	try {
 		const nc: NatsConnection = await connect({
 			servers: url,
@@ -27,19 +50,6 @@ process.loadEnvFile('.env');
 		const sub: Subscription = nc.subscribe('newCoinCreated.prod');
 
 		console.log('Subscribed to newCoinCreated.prod');
-
-		const connection = new Connection(walletUrl, 'confirmed');
-		const key = process.env.SOL_PRIVATE_KEY ?? '';
-		const privateKeyArray = Uint8Array.from(key.split(',').map(Number));
-		const keypair = Keypair.fromSecretKey(privateKeyArray);
-		const wallet = Keypair.fromSecretKey(keypair.secretKey);
-		const bondingCurveProgram = new PublicKey(bondingCurveId);
-
-		const solanaWallet = {
-			connection,
-			wallet,
-			bondingCurveProgram
-		};
 
 		for await (const msg of sub) {
 			const coin = JSON.parse(sc.decode(msg.data));
