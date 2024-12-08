@@ -10,9 +10,8 @@ export default class CoinTrader {
 	private trades: Array<Trade> = [];
 	private hasPosition = false;
 
-	private readonly positionAmount = 0.005;
+	private readonly positionAmount = 0.005 * 1_000_000_000;
 	private readonly startingMarketCap = 7000;
-	private readonly oneSolana = 1 * 1_000_000_000;
 
 	public constructor(
 		private readonly solanaWallet: SolanaWallet,
@@ -52,7 +51,7 @@ export default class CoinTrader {
 	public async buy(): Promise<void> {
 		console.log(`Executing buy for ${this.coin.name}...`);
 
-		const amountInLamports = this.oneSolana;
+		const amountInLamports = this.positionAmount;
 		const mint = new PublicKey(this.coin.mint);
 		const signature = await this.tradeToken(mint, amountInLamports, true);
 		this.hasPosition = true;
@@ -63,7 +62,7 @@ export default class CoinTrader {
 	public async sell(): Promise<void> {
 		console.log(`Executing sell for ${this.coin.name}...`);
 
-		const amountInLamports = this.oneSolana;
+		const amountInLamports = this.positionAmount;
 		const mint = new PublicKey(this.coin.mint);
 		const signature = await this.tradeToken(mint, amountInLamports, false);
 		this.hasPosition = false;
