@@ -33,15 +33,7 @@ export default class CoinMonitor {
 	}
 
 	public subscribeToCoinTrades(coin: Coin): void {
-		const pumpPrivateKey = process.env['PUMP_PRIVATE_KEY'] ?? 'foo';
-		const pumpApiKey = process.env['PUMP_API_KEY'] ?? 'bar';
-
-		const trader = new CoinTrader(
-			this.solanaWallet,
-			coin,
-			pumpPrivateKey,
-			pumpApiKey
-		);
+		const trader = new CoinTrader(this.solanaWallet, coin,);
 
 		const socket = io(
 			this.pumpFunSocketIoUrl,

@@ -16,13 +16,9 @@ export default class CoinTrader {
 	public constructor(
 		private readonly solanaWallet: SolanaWallet,
 		private readonly coin: Coin,
-		private readonly pumpApiKey: string,
-		private readonly pumpPrivateKey: string
 	) {
 		this.solanaWallet = solanaWallet;
 		this.coin = coin;
-		this.pumpApiKey = pumpApiKey;
-		this.pumpPrivateKey = pumpPrivateKey;
 	}
 
 	public async startSniper(): Promise<void> {
