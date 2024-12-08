@@ -1,16 +1,17 @@
 import axios from 'axios';
-
-import {Coin, Trade} from "./coin-monitor";
+import {Coin} from "../types/coin";
+import {Trade} from "../types/trade";
 
 export default class CoinTrader {
 	public shouldTerminate = false;
 
-	private mintSubscription: any;
 	private timeoutHandle: any;
 	private trades: Array<Trade> = [];
 	private hasPosition = false;
-	private readonly startingMarketCap = 7000;
 	private apiUrl = 'https://pumpapi.fun/api/trade';
+
+	private readonly positionAmount = 0.005;
+	private readonly startingMarketCap = 7000;
 
 	constructor(
 		private readonly coin: Coin,
@@ -22,11 +23,11 @@ export default class CoinTrader {
 		this.pumpPrivateKey = pumpPrivateKey;
 	}
 
-	public startSniper() {
+	public async startSniper(): Promise<void> {
 		console.log(`Initiating sniper for ${this.coin.name} (${this.coin.mint})...`);
 
 		if (this.coin.usd_market_cap <= this.startingMarketCap) {
-			this.buy();
+			await this.buy();
 		} else {
 			this.disconnect();
 			return;
@@ -40,7 +41,7 @@ export default class CoinTrader {
 		}, 2 * 60 * 1000); // 2 minutes in milliseconds
 	}
 
-	public stopSniper() {
+	public stopSniper(): void {
 		console.log("Sniper stopped");
 		this.disconnect();
 	}
@@ -54,7 +55,7 @@ export default class CoinTrader {
 				{
 					trade_type: 'buy',
 					mint: this.coin.mint,
-					amount: .05,
+					amount: this.positionAmount,
 					slippage: 25,
 					userPrivateKey: this.pumpPrivateKey,
 				},
@@ -80,7 +81,7 @@ export default class CoinTrader {
 				{
 					trade_type: 'sell',
 					mint: this.coin.mint,
-					amount: .05,
+					amount: this.positionAmount,
 					slippage: 25,
 					userPrivateKey: this.pumpPrivateKey,
 				},
@@ -97,30 +98,27 @@ export default class CoinTrader {
 		}
 	}
 
-	public addTrade(trade: Trade): void {
+	public async addTrade(trade: Trade): Promise<void> {
 		this.trades.push(trade);
-		this.attemptSniperSell(trade);
+
+		await this.attemptSniperSell(trade);
 	}
 
 	private disconnect(): void {
 		console.log(`Disconnecting ${this.coin.name}...`);
 
-		if (this.mintSubscription) {
-			this.mintSubscription.unsubscribe();
-		}
 		if (this.timeoutHandle) {
 			clearTimeout(this.timeoutHandle);
 		}
 	}
 
-	private attemptSniperSell(trade: Trade): void {
+	private async attemptSniperSell(trade: Trade): Promise<void> {
 		if (!this.hasPosition) {
 			return;
 		}
 
 		if (trade.usd_market_cap > 10000) {
-			console.log(`Selling ${this.coin.name}`);
-			this.hasPosition = false;
+			await this.sell();
 			this.shouldTerminate = true;
 		}
 	}
