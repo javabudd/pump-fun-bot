@@ -54,7 +54,7 @@ export default class CoinTrader {
         console.log(
           "No trades made within 2 minutes, selling and disconnecting...",
         );
-        this.sell();
+        this.retrySell();
         this.disconnect();
       },
       2 * 60 * 1000,
@@ -66,7 +66,13 @@ export default class CoinTrader {
     this.disconnect();
   }
 
-  public async buy(): Promise<void> {
+  public async addTrade(trade: Trade): Promise<void> {
+    this.trades.push(trade);
+
+    await this.attemptSniperSell(trade);
+  }
+
+  private async buy(): Promise<void> {
     console.log(`Executing buy for ${this.coin.name}...`);
 
     const mint = new PublicKey(this.coin.mint);
@@ -166,14 +172,16 @@ export default class CoinTrader {
     }
   }
 
-  public async sell(): Promise<void> {
+  private async sell(slippageTolerance: number = 0.25): Promise<void> {
     if (this.isPlacingSale) {
       return;
     }
 
     this.isPlacingSale = true;
 
-    console.log(`Executing sell for ${this.coin.name}...`);
+    console.log(
+      `Executing sell for ${this.coin.name} with slippage ${slippageTolerance}...`,
+    );
 
     const mint = new PublicKey(this.coin.mint);
 
@@ -187,7 +195,7 @@ export default class CoinTrader {
       const transaction = await this.pumpFun.anchorProgram.methods
         .sell(
           new BN(this.positionAmount),
-          new BN(this.positionAmount + this.positionAmount * 0.25),
+          new BN(this.positionAmount + this.positionAmount * slippageTolerance),
         )
         .accounts({
           global: this.pumpFun.global.pda,
@@ -220,10 +228,23 @@ export default class CoinTrader {
     }
   }
 
-  public async addTrade(trade: Trade): Promise<void> {
-    this.trades.push(trade);
+  private async retrySell(): Promise<void> {
+    const maxRetries = 5;
+    const initialSlippage = 0.25;
+    const slippageIncrement = 0.05;
 
-    await this.attemptSniperSell(trade);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const currentSlippage =
+        initialSlippage + slippageIncrement * (attempt - 1);
+      try {
+        await this.sell(currentSlippage);
+        return;
+      } catch (error) {
+        console.log(`Retrying sell (${attempt}/${maxRetries})...`, error);
+        await this.sleep(5000);
+      }
+    }
+    console.error("Failed to execute sell after retries.");
   }
 
   private disconnect(): void {
