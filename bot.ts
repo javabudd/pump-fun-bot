@@ -7,6 +7,7 @@ import {Connection, Keypair, PublicKey,} from '@solana/web3.js';
 
 (async function main(): Promise<void> {
 	const url: string = 'wss://prod-v2.nats.realtime.pump.fun/';
+	const walletUrl: string = 'https://api.mainnet-beta.solana.com';
 	const bondingCurveId = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
 	const sc = StringCodec();
 
@@ -22,10 +23,10 @@ import {Connection, Keypair, PublicKey,} from '@solana/web3.js';
 		console.log('Connected to NATS WebSocket server');
 
 		const sub: Subscription = nc.subscribe('newCoinCreated.prod');
+
 		console.log('Subscribed to newCoinCreated.prod');
 
-		const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-
+		const connection = new Connection(walletUrl, 'confirmed');
 		const keypair = Keypair.generate();
 		const privateKey = Array.from(keypair.secretKey);
 		const secretKey = Uint8Array.from(privateKey);
