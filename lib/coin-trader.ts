@@ -73,7 +73,9 @@ export default class CoinTrader {
   }
 
   private async buy(): Promise<void> {
-    console.log(`Executing buy for ${this.coin.name}...`);
+    const url = `https://pump.fun/coin/${this.coin.mint}`;
+
+    console.log(`Executing buy for ${this.coin.name} at ${url}...`);
 
     const mint = new PublicKey(this.coin.mint);
 
@@ -118,11 +120,9 @@ export default class CoinTrader {
     }
 
     try {
-      const globalAccount =
-        await this.pumpFun.anchorProgram.account.global.fetch(
-          this.pumpFun.global.pda,
-        );
-      console.debug("Global account already initialized:", globalAccount);
+      await this.pumpFun.anchorProgram.account.global.fetch(
+        this.pumpFun.global.pda,
+      );
     } catch {
       console.log("Initializing global account...");
 
@@ -182,10 +182,6 @@ export default class CoinTrader {
 
     this.isPlacingSale = true;
 
-    console.log(
-      `Executing sell for ${this.coin.name} with slippage ${slippageTolerance}...`,
-    );
-
     const mint = new PublicKey(this.coin.mint);
 
     const associatedUserAddress = getAssociatedTokenAddressSync(
@@ -204,6 +200,12 @@ export default class CoinTrader {
     );
 
     const minSolOutput = expectedSolOutput.mul(slippageMultiplier);
+
+    console.log(`Min SOL sell amount: ${minSolOutput}`);
+
+    console.log(
+      `Executing sell for ${this.coin.name} with slippage ${slippageTolerance} and min output ${minSolOutput}...`,
+    );
 
     try {
       const transaction = await this.pumpFun.anchorProgram.methods
@@ -241,7 +243,7 @@ export default class CoinTrader {
 
   private async retrySell(): Promise<void> {
     const maxRetries = 5;
-    const initialSlippage = 0.25;
+    const initialSlippage = 0.05;
     const slippageIncrement = 0.05;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -333,16 +335,10 @@ export default class CoinTrader {
     const feeMultiplier = new BN(10000).sub(feeBasisPoints).div(new BN(10000));
 
     // Calculate expected SOL output using BN arithmetic
-    const expectedSolOutput = amountBN
+    return amountBN
       .mul(virtualSolReserves)
       .div(virtualTokenReserves.add(amountBN))
       .mul(feeMultiplier);
-
-    console.log(
-      `Calculated expected SOL output: ${expectedSolOutput.toString()}, using virtualTokenReserves: ${virtualTokenReserves.toString()}, virtualSolReserves: ${virtualSolReserves.toString()}, feeMultiplier: ${feeMultiplier.toString()}`,
-    );
-
-    return expectedSolOutput;
   }
 
   private parseBondingCurve(data: Buffer): {
