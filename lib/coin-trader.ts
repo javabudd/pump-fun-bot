@@ -176,9 +176,7 @@ export default class CoinTrader {
     }
   }
 
-  private async sell(slippageTolerance: number = 0.1): Promise<void> {
-    this.isPlacingSale = true;
-
+  private async sell(slippageTolerance: number = 0.1): Promise<boolean> {
     const mint = new PublicKey(this.coin.mint);
 
     if (!this.associatedUserAddress) {
@@ -189,9 +187,12 @@ export default class CoinTrader {
       );
     }
 
-    const expectedSolOutput = await this.getExpectedSolOutput(
-      this.positionAmount,
-    );
+    let expectedSolOutput;
+    try {
+      expectedSolOutput = await this.getExpectedSolOutput(this.positionAmount);
+    } catch {
+      return false;
+    }
 
     // Calculate minSolOutput using BN arithmetic
     const slippageMultiplier = new BN(10000 - slippageTolerance * 10000).div(
@@ -235,10 +236,13 @@ export default class CoinTrader {
       await this.sleep(5000);
     } catch {
       console.error("Sell transaction failed!");
+
+      return false;
     }
 
     this.shouldTerminate = true;
-    this.isPlacingSale = false;
+
+    return true;
   }
 
   private async attemptSniperSell(trade: Trade): Promise<void> {
@@ -253,7 +257,7 @@ export default class CoinTrader {
       (trade.virtual_token_reserves + trade.token_amount);
 
     const volumeThreshold = 100_000_000_000_000;
-    const momentumThreshold = 6;
+    const momentumThreshold = 5;
     const priceImpactThreshold = 0.02;
 
     const volumeMetric = trade.token_amount > volumeThreshold;
@@ -266,10 +270,13 @@ export default class CoinTrader {
       console.log({ volumeMetric, momentumMetric, priceChangeMetric });
 
       try {
+        this.isPlacingSale = true;
         await this.sell();
+        this.isPlacingSale = false;
       } catch (error) {
         console.error("Error while attempting to sell:", error);
       }
+
       return;
     }
 
@@ -279,7 +286,9 @@ export default class CoinTrader {
     ) {
       try {
         console.log("30 seconds elapsed. Selling as a fallback...");
+        this.isPlacingSale = true;
         await this.sell();
+        this.isPlacingSale = false;
       } catch (error) {
         console.error("Error while attempting to sell after timeout:", error);
       }
