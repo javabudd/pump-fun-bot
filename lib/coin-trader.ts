@@ -173,8 +173,8 @@ export default class CoinTrader {
       console.log(`Buy transaction successful: ${transaction}`);
 
       this.hasPosition = true;
-    } catch (error) {
-      console.error("Buy transaction failed:", error);
+    } catch {
+      console.error("Buy transaction failed!");
     }
   }
 
@@ -225,13 +225,13 @@ export default class CoinTrader {
         })
         .signers([this.pumpFun.keypair])
         .rpc({
-          maxRetries: 20,
+          maxRetries: 10,
           commitment: "confirmed",
         });
 
       console.log(`Sell transaction successful: ${transaction}`);
-    } catch (error) {
-      console.error("Sell transaction failed:", error);
+    } catch {
+      console.error("Sell transaction failed!");
     }
 
     this.shouldTerminate = true;
