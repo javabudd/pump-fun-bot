@@ -25,6 +25,7 @@ export default class CoinTrader {
   private isPlacingSale = false;
   private hasPosition = false;
   private bondingCurveInfo: AccountInfo<Buffer> | null = null;
+  private associatedUserAddress: PublicKey | null = null;
 
   private readonly positionAmount = 500 * 1_000_000_000; // 500k tokens
   private readonly startingMarketCap = 7000;
@@ -186,11 +187,13 @@ export default class CoinTrader {
 
     const mint = new PublicKey(this.coin.mint);
 
-    const associatedUserAddress = getAssociatedTokenAddressSync(
-      mint,
-      this.pumpFun.keypair.publicKey,
-      false,
-    );
+    if (!this.associatedUserAddress) {
+      this.associatedUserAddress = getAssociatedTokenAddressSync(
+        mint,
+        this.pumpFun.keypair.publicKey,
+        false,
+      );
+    }
 
     const expectedSolOutput = await this.getExpectedSolOutput(
       this.positionAmount,
@@ -219,7 +222,7 @@ export default class CoinTrader {
           associatedBondingCurve: new PublicKey(
             this.coin.associated_bonding_curve,
           ),
-          associatedUser: associatedUserAddress,
+          associatedUser: this.associatedUserAddress,
           rent: SYSVAR_RENT_PUBKEY,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
