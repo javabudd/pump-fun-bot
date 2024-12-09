@@ -271,9 +271,20 @@ export default class CoinTrader {
       return;
     }
 
-    if (trade.usd_market_cap > 15000) {
+    const currentVolume = trade.token_amount;
+    const momentum = this.calculateMomentum();
+
+    const volumeThreshold = 60000000000000;
+    const momentumThreshold = 4;
+
+    if (currentVolume > volumeThreshold || momentum > momentumThreshold) {
       await this.sell();
     }
+  }
+
+  private calculateMomentum(): number {
+    const prices = this.trades.slice(-10).map((t) => t.usd_market_cap);
+    return (prices[prices.length - 1] - prices[0]) / prices[0];
   }
 
   private async ensureAtaInitialized(
