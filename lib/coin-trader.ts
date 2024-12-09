@@ -68,6 +68,12 @@ export default class CoinTrader {
         this.associatedUserAddress,
         this.pumpFun.keypair.publicKey,
         this.pumpFun.keypair,
+        [],
+        {
+          maxRetries: 5,
+          skipPreflight: true,
+          commitment: "finalized",
+        },
       );
 
       console.log(
