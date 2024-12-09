@@ -88,9 +88,13 @@ export default class CoinTrader {
         ),
       );
 
-      await this.pumpFun.connection.sendTransaction(transaction, [
-        this.pumpFun.keypair,
-      ]);
+      try {
+        await this.pumpFun.connection.sendTransaction(transaction, [
+          this.pumpFun.keypair,
+        ]);
+      } catch {
+        console.error("Associated token account creation failed!");
+      }
 
       await this.sleep(100);
 
