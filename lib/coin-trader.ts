@@ -133,6 +133,9 @@ export default class CoinTrader {
       await this.ensureAtaInitialized(associatedUserAddress);
     } catch (error) {
       console.error(error);
+
+      await this.closeAccount();
+
       return false;
     }
 
@@ -277,7 +280,7 @@ export default class CoinTrader {
       try {
         this.isPlacingSale = true;
         if (await this.sell()) {
-          await this.cleanupAfterSale();
+          await this.closeAccount();
           await this.sleep(sleepAfterSell);
         }
         this.isPlacingSale = false;
@@ -299,7 +302,7 @@ export default class CoinTrader {
         );
         this.isPlacingSale = true;
         if (await this.sell()) {
-          await this.cleanupAfterSale();
+          await this.closeAccount();
           await this.sleep(sleepAfterSell);
         }
         this.isPlacingSale = false;
@@ -375,7 +378,7 @@ export default class CoinTrader {
     return { virtualTokenReserves, virtualSolReserves, feeBasisPoints };
   }
 
-  private async cleanupAfterSale(): Promise<void> {
+  private async closeAccount(): Promise<void> {
     if (!this.associatedUserAddress) {
       console.warn("No associated user address found for cleanup.");
       return;
