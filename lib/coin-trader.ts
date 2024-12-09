@@ -28,8 +28,8 @@ export default class CoinTrader {
   private associatedUserAddress: PublicKey | null = null;
   private tradeStartTime?: Date;
 
-  private readonly computeUnits = 200_000;
-  private readonly priorityFee = 5000; // 0.000005 SOL as priority fee
+  private readonly computeUnits = 400_000;
+  private readonly priorityFee = 50000; // 0.000005 SOL as priority fee
   private readonly positionAmount = 500 * 1_000_000_000; // 500k tokens
   private readonly startingMarketCap = 7000;
   private readonly pumpFunAuthority =
@@ -55,7 +55,7 @@ export default class CoinTrader {
     }
   }
 
-  public async closeAccount(): Promise<void> {
+  public closeAccount(): void {
     if (!this.associatedUserAddress) {
       console.warn("No associated user address found for cleanup.");
       return;
@@ -66,7 +66,7 @@ export default class CoinTrader {
     );
 
     try {
-      await closeAccount(
+      closeAccount(
         this.pumpFun.connection,
         this.pumpFun.keypair,
         this.associatedUserAddress,
@@ -78,14 +78,14 @@ export default class CoinTrader {
           skipPreflight: true,
           commitment: "finalized",
         },
-      );
+      ).then(() => {
+        // Reset associated user address to null after cleanup
+        console.log(
+          `Successfully closed associated token account: ${this.associatedUserAddress?.toBase58()}`,
+        );
 
-      console.log(
-        `Successfully closed associated token account: ${this.associatedUserAddress.toBase58()}`,
-      );
-
-      // Reset associated user address to null after cleanup
-      this.associatedUserAddress = null;
+        this.associatedUserAddress = null;
+      });
     } catch {
       console.error(
         `Failed to close associated token account: ${this.associatedUserAddress?.toBase58()}`,
@@ -163,7 +163,7 @@ export default class CoinTrader {
     );
 
     try {
-      await this.ensureAtaInitialized(25);
+      await this.ensureAtaInitialized(12);
     } catch (error) {
       console.error(error);
 
@@ -197,8 +197,8 @@ export default class CoinTrader {
         })
         .signers([this.pumpFun.keypair])
         .rpc({
-          maxRetries: 5,
-          commitment: "confirmed",
+          maxRetries: 10,
+          commitment: "processed",
           skipPreflight: true,
         });
 
@@ -379,7 +379,7 @@ export default class CoinTrader {
         return;
       }
 
-      await this.sleep(1000);
+      await this.sleep(500);
     }
     throw new Error(`ATA initialization failed after ${maxAttempts} retries.`);
   }
