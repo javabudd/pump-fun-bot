@@ -170,7 +170,7 @@ export default class CoinTrader {
       const transaction = await this.pumpFun.anchorProgram.methods
         .buy(
           new BN(this.positionAmount),
-          new BN(0.05), // Max SOL cost
+          new BN(this.positionAmount + this.positionAmount * 0.05), // Max SOL cost with 5% slippage
         )
         .preInstructions(feeInstructions)
         .accounts({
