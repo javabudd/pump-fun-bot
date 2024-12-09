@@ -61,10 +61,6 @@ export default class CoinTrader {
       return;
     }
 
-    console.log(
-      `Closing associated token account: ${this.associatedUserAddress.toBase58()}...`,
-    );
-
     try {
       closeAccount(
         this.pumpFun.connection,
@@ -79,12 +75,9 @@ export default class CoinTrader {
           commitment: "finalized",
         },
       ).then(() => {
-        // Reset associated user address to null after cleanup
         console.log(
           `Successfully closed associated token account: ${this.associatedUserAddress?.toBase58()}`,
         );
-
-        this.associatedUserAddress = null;
       });
     } catch {
       console.error(
@@ -114,7 +107,8 @@ export default class CoinTrader {
 
     console.log("Creating associated token account...");
 
-    const latestBlockhash = await this.pumpFun.connection.getLatestBlockhash();
+    const latestBlockhash =
+      await this.pumpFun.connection.getLatestBlockhash("confirmed");
     const feeInstructions = [
       ComputeBudgetProgram.setComputeUnitPrice({
         microLamports: this.priorityFee,
