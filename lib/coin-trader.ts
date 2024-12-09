@@ -247,6 +247,9 @@ export default class CoinTrader {
       return;
     }
 
+    const sleepAfterSell = 2000;
+    const timeoutSeconds = 45;
+
     const solPriceBefore =
       trade.virtual_sol_reserves / trade.virtual_token_reserves;
     const solPriceAfter =
@@ -270,7 +273,7 @@ export default class CoinTrader {
         this.isPlacingSale = true;
         if (await this.sell()) {
           await this.cleanupAfterSale();
-          await this.sleep(3000);
+          await this.sleep(sleepAfterSell);
         }
         this.isPlacingSale = false;
       } catch (error) {
@@ -282,14 +285,17 @@ export default class CoinTrader {
 
     if (
       this.tradeStartTime &&
-      new Date() >= new Date(this.tradeStartTime.getTime() + 30 * 1000)
+      new Date() >=
+        new Date(this.tradeStartTime.getTime() + timeoutSeconds * 1000)
     ) {
       try {
-        console.log("30 seconds elapsed. Selling as a fallback...");
+        console.log(
+          `${timeoutSeconds} seconds elapsed. Selling as a fallback...`,
+        );
         this.isPlacingSale = true;
         if (await this.sell()) {
           await this.cleanupAfterSale();
-          await this.sleep(3000);
+          await this.sleep(sleepAfterSell);
         }
         this.isPlacingSale = false;
       } catch (error) {
