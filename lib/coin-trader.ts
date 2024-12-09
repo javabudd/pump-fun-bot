@@ -201,7 +201,7 @@ export default class CoinTrader {
     const minSolOutput = expectedSolOutput.mul(slippageMultiplier);
 
     console.log(
-      `Executing sell for ${this.coin.name} with slippage ${slippageTolerance} and min output ${minSolOutput}...`,
+      `Executing sell for "${this.coin.name}" with slippage ${slippageTolerance} and min output ${minSolOutput}...`,
     );
 
     try {
