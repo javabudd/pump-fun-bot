@@ -1,7 +1,6 @@
 import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
 import {
-  AccountInfo,
   PublicKey,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
@@ -23,7 +22,6 @@ export default class CoinTrader {
   private trades: Array<Trade> = [];
   private isPlacingSale = false;
   private hasPosition = false;
-  private bondingCurveInfo: AccountInfo<Buffer> | null = null;
   private associatedUserAddress: PublicKey | null = null;
   private tradeStartTime?: Date;
 
@@ -325,20 +323,16 @@ export default class CoinTrader {
   }
 
   private async getExpectedSolOutput(amount: number): Promise<BN> {
-    if (!this.bondingCurveInfo) {
-      const bondingCurveAddress = new PublicKey(this.coin.bonding_curve);
+    const bondingCurveAddress = new PublicKey(this.coin.bonding_curve);
 
-      const bondingCurveInfo =
-        await this.pumpFun.connection.getAccountInfo(bondingCurveAddress);
+    const bondingCurveInfo =
+      await this.pumpFun.connection.getAccountInfo(bondingCurveAddress);
 
-      if (!bondingCurveInfo) {
-        throw Error("Could not retrieve bonding curve!");
-      }
-
-      this.bondingCurveInfo = bondingCurveInfo;
+    if (!bondingCurveInfo) {
+      throw Error("Could not retrieve bonding curve!");
     }
 
-    const bondingCurveData = this.parseBondingCurve(this.bondingCurveInfo.data);
+    const bondingCurveData = this.parseBondingCurve(bondingCurveInfo.data);
 
     const { virtualTokenReserves, virtualSolReserves, feeBasisPoints } =
       bondingCurveData;
