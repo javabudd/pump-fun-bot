@@ -120,15 +120,18 @@ export default class CoinTrader {
       );
 
       try {
-        await this.pumpFun.connection.sendTransaction(transaction, [
-          this.pumpFun.keypair,
-        ]);
+        await this.pumpFun.connection.sendTransaction(
+          transaction,
+          [this.pumpFun.keypair],
+          {
+            maxRetries: 5,
+            skipPreflight: true,
+          },
+        );
       } catch {
         console.error("Associated token account creation failed!");
         return false;
       }
-
-      await this.sleep(100);
 
       console.log(
         "Associated token account created:",
@@ -176,7 +179,7 @@ export default class CoinTrader {
         .signers([this.pumpFun.keypair])
         .rpc({
           maxRetries: 5,
-          commitment: "processed",
+          commitment: "confirmed",
           skipPreflight: true,
         });
 
