@@ -55,14 +55,14 @@ export default class CoinTrader {
     }
   }
 
-  public closeAccount(): void {
+  public async closeAccount(): Promise<void> {
     if (!this.associatedUserAddress) {
       console.warn("No associated user address found for cleanup.");
       return;
     }
 
     try {
-      closeAccount(
+      await closeAccount(
         this.pumpFun.connection,
         this.pumpFun.keypair,
         this.associatedUserAddress,
@@ -74,16 +74,16 @@ export default class CoinTrader {
           skipPreflight: true,
           commitment: "finalized",
         },
-      ).then(() => {
-        console.log(
-          `Successfully closed associated token account: ${this.associatedUserAddress?.toBase58()}`,
-        );
-      });
+      );
     } catch {
       console.error(
         `Failed to close associated token account: ${this.associatedUserAddress?.toBase58()}`,
       );
     }
+
+    console.log(
+      `Successfully closed associated token account: ${this.associatedUserAddress?.toBase58()}`,
+    );
   }
 
   public async addTrade(trade: Trade): Promise<void> {

@@ -69,7 +69,7 @@ export default class CoinMonitor {
 
     socket.on("disconnect", async () => {
       if (trader) {
-        trader.closeAccount();
+        await trader.closeAccount();
       }
 
       delete this.monitoredCoins[coin.mint];
