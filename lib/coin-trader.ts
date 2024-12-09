@@ -1,6 +1,7 @@
 import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
 import {
+  AccountInfo,
   PublicKey,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
@@ -14,6 +15,7 @@ import {
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { PumpFun } from "../types/pump-fun";
+import { Buffer } from "buffer";
 
 export default class CoinTrader {
   public shouldTerminate = false;
@@ -22,6 +24,7 @@ export default class CoinTrader {
   private timeoutHandle?: NodeJS.Timeout;
   private isPlacingSale = false;
   private hasPosition = false;
+  private bondingCurveInfo: AccountInfo<Buffer> | null = null;
 
   private readonly positionAmount = 500 * 1_000_000_000; // 500k tokens
   private readonly startingMarketCap = 7000;
@@ -290,29 +293,28 @@ export default class CoinTrader {
   }
 
   private async getExpectedSolOutput(amount: number): Promise<BN> {
-    const bondingCurveAddress = new PublicKey(this.coin.bonding_curve);
+    if (!this.bondingCurveInfo) {
+      const bondingCurveAddress = new PublicKey(this.coin.bonding_curve);
 
-    // Fetch bonding curve account data
-    const bondingCurveInfo =
-      await this.pumpFun.connection.getAccountInfo(bondingCurveAddress);
+      const bondingCurveInfo =
+        await this.pumpFun.connection.getAccountInfo(bondingCurveAddress);
 
-    if (!bondingCurveInfo) {
-      throw new Error("Failed to fetch bonding curve information");
+      if (!bondingCurveInfo) {
+        throw Error("Could not retrieve bonding curve!");
+      }
+
+      this.bondingCurveInfo = bondingCurveInfo;
     }
 
-    // Parse the bonding curve data
-    const bondingCurveData = this.parseBondingCurve(bondingCurveInfo.data);
+    const bondingCurveData = this.parseBondingCurve(this.bondingCurveInfo.data);
 
     const { virtualTokenReserves, virtualSolReserves, feeBasisPoints } =
       bondingCurveData;
 
-    // Convert inputs to BN
     const amountBN = new BN(amount);
 
-    // Fee multiplier as a BN (10000 - feeBasisPoints) / 10000
     const feeMultiplier = new BN(10000).sub(feeBasisPoints).div(new BN(10000));
 
-    // Calculate expected SOL output using BN arithmetic
     return amountBN
       .mul(virtualSolReserves)
       .div(virtualTokenReserves.add(amountBN))
@@ -324,7 +326,6 @@ export default class CoinTrader {
     virtualSolReserves: BN;
     feeBasisPoints: BN;
   } {
-    // Parse the bonding curve data and return BN values
     const virtualTokenReserves = new BN(data.slice(0, 8), "le"); // u64
     const virtualSolReserves = new BN(data.slice(8, 16), "le"); // u64
     const feeBasisPoints = new BN(data.slice(16, 20), "le"); // u32
