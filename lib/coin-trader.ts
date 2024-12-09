@@ -25,6 +25,7 @@ export default class CoinTrader {
   private hasPosition = false;
   private bondingCurveInfo: AccountInfo<Buffer> | null = null;
   private associatedUserAddress: PublicKey | null = null;
+  private tradeStartTime?: Date;
 
   private readonly positionAmount = 500 * 1_000_000_000; // 500k tokens
   private readonly startingMarketCap = 7000;
@@ -159,6 +160,7 @@ export default class CoinTrader {
 
       console.log(`Buy transaction successful: ${transaction}`);
 
+      this.tradeStartTime = new Date();
       this.hasPosition = true;
     } catch {
       console.error("Buy transaction failed!");
@@ -235,14 +237,40 @@ export default class CoinTrader {
       return;
     }
 
-    const currentVolume = trade.token_amount;
-    const momentum = this.calculateMomentum();
+    const solPriceBefore =
+      trade.virtual_sol_reserves / trade.virtual_token_reserves;
+    const solPriceAfter =
+      (trade.virtual_sol_reserves + trade.sol_amount) /
+      (trade.virtual_token_reserves + trade.token_amount);
 
-    const volumeThreshold = 60000000000000;
+    const volumeThreshold = 1_000_000_000_000;
     const momentumThreshold = 4;
+    const priceImpactThreshold = 0.02;
 
-    if (currentVolume > volumeThreshold || momentum > momentumThreshold) {
-      await this.sell();
+    if (
+      trade.token_amount > volumeThreshold ||
+      this.calculateMomentum() > momentumThreshold ||
+      Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore) >
+        priceImpactThreshold
+    ) {
+      try {
+        await this.sell();
+      } catch (error) {
+        console.error("Error while attempting to sell:", error);
+      }
+      return;
+    }
+
+    if (
+      this.tradeStartTime &&
+      new Date() >= new Date(this.tradeStartTime.getTime() + 30 * 1000)
+    ) {
+      try {
+        console.log("30 seconds elapsed. Selling as a fallback...");
+        await this.sell();
+      } catch (error) {
+        console.error("Error while attempting to sell after timeout:", error);
+      }
     }
   }
 
