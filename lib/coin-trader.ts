@@ -1,6 +1,7 @@
 import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
 import {
+  ComputeBudgetProgram,
   PublicKey,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
@@ -27,6 +28,8 @@ export default class CoinTrader {
   private associatedUserAddress: PublicKey | null = null;
   private tradeStartTime?: Date;
 
+  private readonly computeUnits = 200_000;
+  private readonly priorityFee = 5000; // 0.000005 SOL as priority fee
   private readonly positionAmount = 500 * 1_000_000_000; // 500k tokens
   private readonly startingMarketCap = 7000;
   private readonly pumpFunAuthority =
@@ -112,11 +115,20 @@ export default class CoinTrader {
     console.log("Creating associated token account...");
 
     const latestBlockhash = await this.pumpFun.connection.getLatestBlockhash();
+    const feeInstructions = [
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: this.priorityFee,
+      }),
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: this.computeUnits,
+      }),
+    ];
 
     const message = new TransactionMessage({
       payerKey: this.pumpFun.keypair.publicKey,
       recentBlockhash: latestBlockhash.blockhash,
       instructions: [
+        ...feeInstructions,
         createAssociatedTokenAccountInstruction(
           this.pumpFun.keypair.publicKey,
           this.associatedUserAddress!,
@@ -166,6 +178,7 @@ export default class CoinTrader {
           new BN(this.positionAmount),
           new BN(0.05), // Max SOL cost
         )
+        .preInstructions(feeInstructions)
         .accounts({
           global: this.pumpFun.global.pda,
           user: this.pumpFun.keypair.publicKey,
@@ -234,6 +247,14 @@ export default class CoinTrader {
     try {
       const transaction = await this.pumpFun.anchorProgram.methods
         .sell(new BN(this.positionAmount), new BN(minSolOutput))
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitPrice({
+            microLamports: this.priorityFee,
+          }),
+          ComputeBudgetProgram.setComputeUnitLimit({
+            units: this.computeUnits,
+          }),
+        ])
         .accounts({
           global: this.pumpFun.global.pda,
           user: this.pumpFun.keypair.publicKey,
