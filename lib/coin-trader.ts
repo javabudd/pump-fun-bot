@@ -280,7 +280,7 @@ export default class CoinTrader {
   }
 
   private calculateMomentum(): number {
-    const prices = this.trades.slice(-10).map((t) => t.usd_market_cap);
+    const prices = this.trades.slice(-20).map((t) => t.usd_market_cap);
     return (prices[prices.length - 1] - prices[0]) / prices[0];
   }
 
