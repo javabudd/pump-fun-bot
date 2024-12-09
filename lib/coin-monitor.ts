@@ -68,22 +68,12 @@ export default class CoinMonitor {
 
     socket.on("disconnect", (reason) => {
       console.log(`Disconnected from trade room: ${reason}`);
-
-      if (trader) {
-        trader.stopSniper();
-      }
-
       delete this.monitoredCoins[coin.mint];
       trader = null;
     });
 
     socket.on("connect_error", (err) => {
       console.error("Socket connection error:", err);
-
-      if (trader) {
-        trader.stopSniper();
-      }
-
       delete this.monitoredCoins[coin.mint];
       trader = null;
     });

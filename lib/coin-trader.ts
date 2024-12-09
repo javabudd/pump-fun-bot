@@ -21,7 +21,6 @@ export default class CoinTrader {
   public shouldTerminate = false;
 
   private trades: Array<Trade> = [];
-  private timeoutHandle?: NodeJS.Timeout;
   private isPlacingSale = false;
   private hasPosition = false;
   private bondingCurveInfo: AccountInfo<Buffer> | null = null;
@@ -48,26 +47,8 @@ export default class CoinTrader {
     if (this.coin.usd_market_cap <= this.startingMarketCap) {
       await this.buy();
     } else {
-      this.disconnect();
       return;
     }
-
-    // Sell and disconnect after 2 minutes if no trades are made
-    this.timeoutHandle = setTimeout(
-      () => {
-        console.log(
-          "No trades made within 2 minutes, selling and disconnecting...",
-        );
-        this.sell();
-        this.disconnect();
-      },
-      2 * 60 * 1000,
-    ); // 2 minutes in milliseconds
-  }
-
-  public stopSniper(): void {
-    console.log("Sniper stopped");
-    this.disconnect();
   }
 
   public async addTrade(trade: Trade): Promise<void> {
@@ -246,14 +227,6 @@ export default class CoinTrader {
 
     this.shouldTerminate = true;
     this.isPlacingSale = false;
-  }
-
-  private disconnect(): void {
-    console.log(`Disconnecting ${this.coin.name}...`);
-
-    if (this.timeoutHandle) {
-      clearTimeout(this.timeoutHandle);
-    }
   }
 
   private async attemptSniperSell(trade: Trade): Promise<void> {
