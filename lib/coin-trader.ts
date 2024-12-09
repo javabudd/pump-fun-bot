@@ -9,6 +9,7 @@ import {
 import { BN } from "@project-serum/anchor";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
+  closeAccount,
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddressSync,
   TOKEN_PROGRAM_ID,
@@ -230,8 +231,6 @@ export default class CoinTrader {
         });
 
       console.log(`Sell transaction successful: ${transaction}`);
-
-      await this.sleep(5000);
     } catch {
       console.error("Sell transaction failed!");
 
@@ -269,7 +268,10 @@ export default class CoinTrader {
 
       try {
         this.isPlacingSale = true;
-        await this.sell();
+        if (await this.sell()) {
+          await this.cleanupAfterSale();
+          await this.sleep(3000);
+        }
         this.isPlacingSale = false;
       } catch (error) {
         console.error("Error while attempting to sell:", error);
@@ -357,5 +359,39 @@ export default class CoinTrader {
     const feeBasisPoints = new BN(data.slice(16, 20), "le"); // u32
 
     return { virtualTokenReserves, virtualSolReserves, feeBasisPoints };
+  }
+
+  private async cleanupAfterSale(): Promise<void> {
+    if (!this.associatedUserAddress) {
+      console.warn("No associated user address found for cleanup.");
+      return;
+    }
+
+    console.log(
+      `Closing associated token account: ${this.associatedUserAddress.toBase58()}...`,
+    );
+
+    try {
+      const transactionSignature = await closeAccount(
+        this.pumpFun.connection,
+        this.pumpFun.keypair,
+        this.associatedUserAddress,
+        this.pumpFun.keypair.publicKey,
+        this.pumpFun.keypair,
+      );
+
+      console.log(
+        `Successfully closed associated token account: ${this.associatedUserAddress.toBase58()}`,
+        `Transaction signature: ${transactionSignature}`,
+      );
+
+      // Reset associated user address to null after cleanup
+      this.associatedUserAddress = null;
+    } catch (error) {
+      console.error(
+        `Failed to close associated token account: ${this.associatedUserAddress?.toBase58()}`,
+        error,
+      );
+    }
   }
 }
