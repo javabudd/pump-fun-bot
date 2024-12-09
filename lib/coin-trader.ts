@@ -108,47 +108,37 @@ export default class CoinTrader {
       false,
     );
 
-    const ataInfo = await this.pumpFun.connection.getAccountInfo(
-      this.associatedUserAddress,
+    console.log("Creating associated token account...");
+
+    const transaction = new Transaction().add(
+      createAssociatedTokenAccountInstruction(
+        this.pumpFun.keypair.publicKey,
+        this.associatedUserAddress,
+        this.pumpFun.keypair.publicKey,
+        mint,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      ),
     );
-    if (!ataInfo) {
-      console.log("Creating associated token account...");
 
-      const transaction = new Transaction().add(
-        createAssociatedTokenAccountInstruction(
-          this.pumpFun.keypair.publicKey,
-          this.associatedUserAddress,
-          this.pumpFun.keypair.publicKey,
-          mint,
-          TOKEN_PROGRAM_ID,
-          ASSOCIATED_TOKEN_PROGRAM_ID,
-        ),
+    try {
+      await this.pumpFun.connection.sendTransaction(
+        transaction,
+        [this.pumpFun.keypair],
+        {
+          maxRetries: 3,
+          skipPreflight: true,
+        },
       );
-
-      try {
-        await this.pumpFun.connection.sendTransaction(
-          transaction,
-          [this.pumpFun.keypair],
-          {
-            maxRetries: 5,
-            skipPreflight: true,
-          },
-        );
-      } catch {
-        console.error("Associated token account creation failed!");
-        return false;
-      }
-
-      console.log(
-        "Associated token account created:",
-        this.associatedUserAddress.toBase58(),
-      );
-    } else {
-      console.log(
-        "Associated token account already exists:",
-        this.associatedUserAddress.toBase58(),
-      );
+    } catch {
+      console.error("Associated token account creation failed!");
+      return false;
     }
+
+    console.log(
+      "Associated token account created:",
+      this.associatedUserAddress.toBase58(),
+    );
 
     try {
       await this.ensureAtaInitialized(7);
@@ -349,14 +339,18 @@ export default class CoinTrader {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const ataInfo = await this.pumpFun.connection.getAccountInfo(
         this.associatedUserAddress,
+        {
+          commitment: "processed",
+        },
       );
+
       if (ataInfo) {
         return;
       }
 
       await this.sleep(1000);
     }
-    throw new Error("ATA initialization failed after retries.");
+    throw new Error(`ATA initialization failed after ${maxAttempts} retries.`);
   }
 
   private sleep(ms: number): Promise<void> {
@@ -366,8 +360,10 @@ export default class CoinTrader {
   private async getExpectedSolOutput(amount: number): Promise<BN> {
     const bondingCurveAddress = new PublicKey(this.coin.bonding_curve);
 
-    const bondingCurveInfo =
-      await this.pumpFun.connection.getAccountInfo(bondingCurveAddress);
+    const bondingCurveInfo = await this.pumpFun.connection.getAccountInfo(
+      bondingCurveAddress,
+      { commitment: "confirmed" },
+    );
 
     if (!bondingCurveInfo) {
       throw Error("Could not retrieve bonding curve!");
