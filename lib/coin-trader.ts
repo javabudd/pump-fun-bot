@@ -94,6 +94,7 @@ export default class CoinTrader {
         ]);
       } catch {
         console.error("Associated token account creation failed!");
+        return;
       }
 
       await this.sleep(100);
