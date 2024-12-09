@@ -33,7 +33,7 @@ export default class CoinMonitor {
   }
 
   public subscribeToCoinTrades(coin: Coin): void {
-    const trader = new CoinTrader(this.pumpFun, coin);
+    let trader: CoinTrader | null = new CoinTrader(this.pumpFun, coin);
 
     const socket = io(this.pumpFunSocketIoUrl, {
       path: "/socket.io/",
@@ -41,6 +41,10 @@ export default class CoinMonitor {
     });
 
     socket.on("connect", async () => {
+      if (!trader) {
+        return;
+      }
+
       socket.emit("joinTradeRoom", { mint: coin.mint });
 
       await trader.startSniper();
@@ -49,24 +53,39 @@ export default class CoinMonitor {
     });
 
     socket.on("tradeCreated", async (data) => {
+      if (!trader) {
+        return;
+      }
+
       const trade: Trade = data;
       await this.handleTrade(trader, trade);
 
       if (trader.shouldTerminate) {
         delete this.monitoredCoins[coin.mint];
+        trader = null;
       }
     });
 
     socket.on("disconnect", (reason) => {
       console.log(`Disconnected from trade room: ${reason}`);
-      trader.stopSniper();
+
+      if (trader) {
+        trader.stopSniper();
+      }
+
       delete this.monitoredCoins[coin.mint];
+      trader = null;
     });
 
     socket.on("connect_error", (err) => {
       console.error("Socket connection error:", err);
-      trader.stopSniper();
+
+      if (trader) {
+        trader.stopSniper();
+      }
+
       delete this.monitoredCoins[coin.mint];
+      trader = null;
     });
   }
 

@@ -289,7 +289,6 @@ export default class CoinTrader {
         return;
       }
 
-      console.log(`Retrying ATA creation (${attempt + 1}/${maxAttempts})...`);
       await this.sleep(1000);
     }
     throw new Error("ATA initialization failed after retries.");
