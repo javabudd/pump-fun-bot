@@ -129,7 +129,12 @@ export default class CoinTrader {
       console.log("Global account initialized.");
     }
 
-    await this.ensureAtaInitialized(associatedUserAddress);
+    try {
+      await this.ensureAtaInitialized(associatedUserAddress);
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
 
     try {
       console.log("Executing buy transaction...");
@@ -314,7 +319,7 @@ export default class CoinTrader {
 
   private async ensureAtaInitialized(
     associatedUserAddress: PublicKey,
-    maxAttempts = 15,
+    maxAttempts = 5,
   ): Promise<void> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const ataInfo = await this.pumpFun.connection.getAccountInfo(
