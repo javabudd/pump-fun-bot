@@ -385,10 +385,8 @@ export default class CoinTrader {
   private async getExpectedSolOutput(amount: number): Promise<BN> {
     const bondingCurveAddress = new PublicKey(this.coin.bonding_curve);
 
-    const bondingCurveInfo = await this.pumpFun.connection.getAccountInfo(
-      bondingCurveAddress,
-      { commitment: "confirmed" },
-    );
+    const bondingCurveInfo =
+      await this.pumpFun.connection.getAccountInfo(bondingCurveAddress);
 
     if (!bondingCurveInfo) {
       throw Error("Could not retrieve bonding curve!");
