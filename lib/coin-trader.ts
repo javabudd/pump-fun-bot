@@ -19,7 +19,6 @@ export default class CoinTrader {
   public shouldTerminate = false;
 
   private trades: Array<Trade> = [];
-  private hasPosition = false;
   private timeoutHandle?: NodeJS.Timeout;
   private isPlacingSale = false;
 
@@ -54,7 +53,7 @@ export default class CoinTrader {
         console.log(
           "No trades made within 2 minutes, selling and disconnecting...",
         );
-        this.retrySell();
+        this.sell();
         this.disconnect();
       },
       2 * 60 * 1000,
@@ -166,16 +165,19 @@ export default class CoinTrader {
           program: this.pumpFun.anchorProgram.programId,
         })
         .signers([this.pumpFun.keypair])
-        .rpc();
+        .rpc({
+          maxRetries: 5,
+        });
 
       console.log(`Buy transaction successful: ${transaction}`);
-      this.hasPosition = true;
     } catch (error) {
       console.error("Buy transaction failed:", error);
     }
   }
 
   private async sell(slippageTolerance: number = 0.05): Promise<void> {
+    this.isPlacingSale = true;
+
     const mint = new PublicKey(this.coin.mint);
 
     const associatedUserAddress = getAssociatedTokenAddressSync(
@@ -219,40 +221,17 @@ export default class CoinTrader {
           program: this.pumpFun.anchorProgram.programId,
         })
         .signers([this.pumpFun.keypair])
-        .rpc();
+        .rpc({
+          maxRetries: 5,
+        });
 
-      console.log(transaction);
       console.log(`Sell transaction successful: ${transaction}`);
-
-      this.hasPosition = false;
-      this.shouldTerminate = true;
     } catch (error) {
       console.error("Sell transaction failed:", error);
     }
-  }
 
-  private async retrySell(): Promise<void> {
-    const maxRetries = 5;
-    const initialSlippage = 0.05;
-    const slippageIncrement = 0.05;
-
-    this.isPlacingSale = true;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const currentSlippage =
-        initialSlippage + slippageIncrement * (attempt - 1);
-      try {
-        await this.sell(currentSlippage);
-        return;
-      } catch (error) {
-        console.log(`Retrying sell (${attempt}/${maxRetries})...`, error);
-        await this.sleep(5000);
-      }
-    }
-
+    this.shouldTerminate = true;
     this.isPlacingSale = false;
-
-    console.error("Failed to execute sell after retries.");
   }
 
   private disconnect(): void {
@@ -264,7 +243,7 @@ export default class CoinTrader {
   }
 
   private async attemptSniperSell(trade: Trade): Promise<void> {
-    if (!this.hasPosition || this.isPlacingSale) {
+    if (this.isPlacingSale) {
       return;
     }
 
@@ -275,7 +254,7 @@ export default class CoinTrader {
     const momentumThreshold = 4;
 
     if (currentVolume > volumeThreshold || momentum > momentumThreshold) {
-      await this.retrySell();
+      await this.sell();
     }
   }
 
