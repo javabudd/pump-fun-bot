@@ -72,7 +72,7 @@ export default class CoinTrader {
         {
           maxRetries: 5,
           skipPreflight: true,
-          commitment: "finalized",
+          commitment: "processed",
         },
       );
     } catch {
