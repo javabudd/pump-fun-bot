@@ -250,6 +250,8 @@ export default class CoinTrader {
     } catch {
       console.error("Sell transaction failed!");
 
+      this.shouldTerminate = true;
+
       return false;
     }
 
@@ -411,10 +413,9 @@ export default class CoinTrader {
 
       // Reset associated user address to null after cleanup
       this.associatedUserAddress = null;
-    } catch (error) {
+    } catch {
       console.error(
         `Failed to close associated token account: ${this.associatedUserAddress?.toBase58()}`,
-        error,
       );
     }
   }
