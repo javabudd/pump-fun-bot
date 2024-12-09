@@ -96,14 +96,14 @@ export default class CoinTrader {
 
     const mint = new PublicKey(this.coin.mint);
 
-    const associatedUserAddress = getAssociatedTokenAddressSync(
+    this.associatedUserAddress = getAssociatedTokenAddressSync(
       mint,
       this.pumpFun.keypair.publicKey,
       false,
     );
 
     const ataInfo = await this.pumpFun.connection.getAccountInfo(
-      associatedUserAddress,
+      this.associatedUserAddress,
     );
     if (!ataInfo) {
       console.log("Creating associated token account...");
@@ -111,7 +111,7 @@ export default class CoinTrader {
       const transaction = new Transaction().add(
         createAssociatedTokenAccountInstruction(
           this.pumpFun.keypair.publicKey,
-          associatedUserAddress,
+          this.associatedUserAddress,
           this.pumpFun.keypair.publicKey,
           mint,
           TOKEN_PROGRAM_ID,
@@ -132,12 +132,12 @@ export default class CoinTrader {
 
       console.log(
         "Associated token account created:",
-        associatedUserAddress.toBase58(),
+        this.associatedUserAddress.toBase58(),
       );
     } else {
       console.log(
         "Associated token account already exists:",
-        associatedUserAddress.toBase58(),
+        this.associatedUserAddress.toBase58(),
       );
     }
 
@@ -161,16 +161,8 @@ export default class CoinTrader {
       console.log("Global account initialized.");
     }
 
-    if (!this.associatedUserAddress) {
-      this.associatedUserAddress = getAssociatedTokenAddressSync(
-        mint,
-        this.pumpFun.keypair.publicKey,
-        false,
-      );
-    }
-
     try {
-      await this.ensureAtaInitialized(associatedUserAddress);
+      await this.ensureAtaInitialized();
     } catch (error) {
       console.error(error);
 
@@ -194,7 +186,7 @@ export default class CoinTrader {
           associatedBondingCurve: new PublicKey(
             this.coin.associated_bonding_curve,
           ),
-          associatedUser: associatedUserAddress,
+          associatedUser: this.associatedUserAddress,
           rent: SYSVAR_RENT_PUBKEY,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
@@ -358,13 +350,10 @@ export default class CoinTrader {
     return (prices[prices.length - 1] - prices[0]) / prices[0];
   }
 
-  private async ensureAtaInitialized(
-    associatedUserAddress: PublicKey,
-    maxAttempts = 5,
-  ): Promise<void> {
+  private async ensureAtaInitialized(maxAttempts = 5): Promise<void> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const ataInfo = await this.pumpFun.connection.getAccountInfo(
-        associatedUserAddress,
+        this.associatedUserAddress,
       );
       if (ataInfo) {
         return;
