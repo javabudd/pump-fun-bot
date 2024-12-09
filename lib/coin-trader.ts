@@ -51,6 +51,38 @@ export default class CoinTrader {
     }
   }
 
+  public async closeAccount(): Promise<void> {
+    if (!this.associatedUserAddress) {
+      console.warn("No associated user address found for cleanup.");
+      return;
+    }
+
+    console.log(
+      `Closing associated token account: ${this.associatedUserAddress.toBase58()}...`,
+    );
+
+    try {
+      await closeAccount(
+        this.pumpFun.connection,
+        this.pumpFun.keypair,
+        this.associatedUserAddress,
+        this.pumpFun.keypair.publicKey,
+        this.pumpFun.keypair,
+      );
+
+      console.log(
+        `Successfully closed associated token account: ${this.associatedUserAddress.toBase58()}`,
+      );
+
+      // Reset associated user address to null after cleanup
+      this.associatedUserAddress = null;
+    } catch {
+      console.error(
+        `Failed to close associated token account: ${this.associatedUserAddress?.toBase58()}`,
+      );
+    }
+  }
+
   public async addTrade(trade: Trade): Promise<void> {
     this.trades.push(trade);
 
@@ -141,8 +173,6 @@ export default class CoinTrader {
       await this.ensureAtaInitialized(associatedUserAddress);
     } catch (error) {
       console.error(error);
-
-      await this.closeAccount();
 
       return false;
     }
@@ -290,7 +320,6 @@ export default class CoinTrader {
       try {
         this.isPlacingSale = true;
         if (await this.sell()) {
-          await this.closeAccount();
           await this.sleep(sleepAfterSell);
         }
         this.isPlacingSale = false;
@@ -312,7 +341,6 @@ export default class CoinTrader {
         );
         this.isPlacingSale = true;
         if (await this.sell()) {
-          await this.closeAccount();
           await this.sleep(sleepAfterSell);
         }
         this.isPlacingSale = false;
@@ -386,37 +414,5 @@ export default class CoinTrader {
     const feeBasisPoints = new BN(data.slice(16, 20), "le"); // u32
 
     return { virtualTokenReserves, virtualSolReserves, feeBasisPoints };
-  }
-
-  private async closeAccount(): Promise<void> {
-    if (!this.associatedUserAddress) {
-      console.warn("No associated user address found for cleanup.");
-      return;
-    }
-
-    console.log(
-      `Closing associated token account: ${this.associatedUserAddress.toBase58()}...`,
-    );
-
-    try {
-      await closeAccount(
-        this.pumpFun.connection,
-        this.pumpFun.keypair,
-        this.associatedUserAddress,
-        this.pumpFun.keypair.publicKey,
-        this.pumpFun.keypair,
-      );
-
-      console.log(
-        `Successfully closed associated token account: ${this.associatedUserAddress.toBase58()}`,
-      );
-
-      // Reset associated user address to null after cleanup
-      this.associatedUserAddress = null;
-    } catch {
-      console.error(
-        `Failed to close associated token account: ${this.associatedUserAddress?.toBase58()}`,
-      );
-    }
   }
 }

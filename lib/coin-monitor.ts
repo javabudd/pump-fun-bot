@@ -67,7 +67,11 @@ export default class CoinMonitor {
       }
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
+      if (trader) {
+        await trader.closeAccount();
+      }
+
       delete this.monitoredCoins[coin.mint];
       trader = null;
     });
