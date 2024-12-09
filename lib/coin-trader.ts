@@ -175,7 +175,7 @@ export default class CoinTrader {
     }
   }
 
-  private async sell(slippageTolerance: number = 0.25): Promise<void> {
+  private async sell(slippageTolerance: number = 0.05): Promise<void> {
     if (this.isPlacingSale) {
       return;
     }
