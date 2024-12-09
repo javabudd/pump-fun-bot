@@ -129,6 +129,14 @@ export default class CoinTrader {
       console.log("Global account initialized.");
     }
 
+    if (!this.associatedUserAddress) {
+      this.associatedUserAddress = getAssociatedTokenAddressSync(
+        mint,
+        this.pumpFun.keypair.publicKey,
+        false,
+      );
+    }
+
     try {
       await this.ensureAtaInitialized(associatedUserAddress);
     } catch (error) {
@@ -234,7 +242,7 @@ export default class CoinTrader {
         .signers([this.pumpFun.keypair])
         .rpc({
           maxRetries: 5,
-          commitment: "confirmed",
+          commitment: "finalized",
           skipPreflight: true,
         });
 
