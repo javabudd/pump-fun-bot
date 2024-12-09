@@ -69,8 +69,7 @@ export default class CoinMonitor {
       }
     });
 
-    socket.on("disconnect", (reason) => {
-      console.log(`Disconnected from trade room: ${reason}`);
+    socket.on("disconnect", () => {
       delete this.monitoredCoins[coin.mint];
       trader = null;
     });
