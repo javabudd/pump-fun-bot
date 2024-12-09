@@ -23,7 +23,7 @@ export default class CoinTrader {
   private timeoutHandle?: NodeJS.Timeout;
   private isPlacingSale = false;
 
-  private readonly positionAmount = 250 * 1_000_000_000; // 1 million
+  private readonly positionAmount = 500 * 1_000_000_000; // 500k tokens
   private readonly startingMarketCap = 7000;
   private readonly pumpFunAuthority =
     "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
