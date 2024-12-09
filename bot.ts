@@ -18,16 +18,28 @@ type GlobalAccount = {
 
 (async function main(): Promise<void> {
   const url: string = "wss://prod-v2.nats.realtime.pump.fun/";
-  const walletUrl: string = "https://api.mainnet-beta.solana.com";
+
+  let walletUrl: string = "https://api.mainnet-beta.solana.com";
+  const websocketUrl = "wss://api.mainnet-beta.solana.com";
+
+  if (process.env.WALLET_RPC_URL) {
+    walletUrl = process.env.WALLET_RPC_URL;
+  }
+
   const bondingCurveId = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
   const sc = StringCodec();
 
   let connection, keypair;
 
   try {
-    connection = new Connection(walletUrl, "confirmed");
+    connection = new Connection(walletUrl, {
+      commitment: "confirmed",
+      wsEndpoint: websocketUrl,
+    });
+
     const key = process.env.SOL_PRIVATE_KEY ?? "";
     const privateKeyArray = Uint8Array.from(key.split(",").map(Number));
+
     keypair = Keypair.fromSecretKey(privateKeyArray);
   } catch (err) {
     console.error("Error loading Solana wallet:", err);

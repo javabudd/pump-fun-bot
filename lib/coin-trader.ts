@@ -4,7 +4,8 @@ import {
   PublicKey,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
-  Transaction,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { BN } from "@project-serum/anchor";
 import {
@@ -110,23 +111,32 @@ export default class CoinTrader {
 
     console.log("Creating associated token account...");
 
-    const transaction = new Transaction().add(
-      createAssociatedTokenAccountInstruction(
-        this.pumpFun.keypair.publicKey,
-        this.associatedUserAddress,
-        this.pumpFun.keypair.publicKey,
-        mint,
-        TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID,
-      ),
-    );
+    const latestBlockhash = await this.pumpFun.connection.getLatestBlockhash();
+
+    const message = new TransactionMessage({
+      payerKey: this.pumpFun.keypair.publicKey,
+      recentBlockhash: latestBlockhash.blockhash,
+      instructions: [
+        createAssociatedTokenAccountInstruction(
+          this.pumpFun.keypair.publicKey,
+          this.associatedUserAddress!,
+          this.pumpFun.keypair.publicKey,
+          mint,
+          TOKEN_PROGRAM_ID,
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+        ),
+      ],
+    }).compileToV0Message();
+
+    const versionedTransaction = new VersionedTransaction(message);
+
+    versionedTransaction.sign([this.pumpFun.keypair]);
 
     try {
-      await this.pumpFun.connection.sendTransaction(
-        transaction,
-        [this.pumpFun.keypair],
+      await this.pumpFun.connection.sendRawTransaction(
+        versionedTransaction.serialize(),
         {
-          maxRetries: 3,
+          maxRetries: 1,
           skipPreflight: true,
         },
       );
@@ -141,12 +151,20 @@ export default class CoinTrader {
     );
 
     try {
+      await this.ensureAtaInitialized(25);
+    } catch (error) {
+      console.error(error);
+
+      return false;
+    }
+
+    try {
       console.log("Executing buy transaction...");
 
       const transaction = await this.pumpFun.anchorProgram.methods
         .buy(
           new BN(this.positionAmount),
-          new BN(this.positionAmount + this.positionAmount * 0.05), // Max SOL cost with 5% slippage
+          new BN(0.05), // Max SOL cost
         )
         .accounts({
           global: this.pumpFun.global.pda,
@@ -167,7 +185,7 @@ export default class CoinTrader {
         .signers([this.pumpFun.keypair])
         .rpc({
           maxRetries: 5,
-          commitment: "processed",
+          commitment: "confirmed",
           skipPreflight: true,
         });
 
