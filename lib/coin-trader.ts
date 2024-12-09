@@ -351,6 +351,12 @@ export default class CoinTrader {
   }
 
   private async ensureAtaInitialized(maxAttempts = 5): Promise<void> {
+    if (!this.associatedUserAddress) {
+      throw new Error(
+        "ATA initialization does not have required associated user address.",
+      );
+    }
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const ataInfo = await this.pumpFun.connection.getAccountInfo(
         this.associatedUserAddress,
