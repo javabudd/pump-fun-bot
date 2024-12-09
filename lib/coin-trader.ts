@@ -178,7 +178,7 @@ export default class CoinTrader {
     }
   }
 
-  private async sell(slippageTolerance: number = 0.05): Promise<void> {
+  private async sell(slippageTolerance: number = 0.1): Promise<void> {
     this.isPlacingSale = true;
 
     const mint = new PublicKey(this.coin.mint);
@@ -225,7 +225,8 @@ export default class CoinTrader {
         })
         .signers([this.pumpFun.keypair])
         .rpc({
-          maxRetries: 5,
+          maxRetries: 20,
+          commitment: "confirmed",
         });
 
       console.log(`Sell transaction successful: ${transaction}`);
