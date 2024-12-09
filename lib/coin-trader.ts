@@ -287,7 +287,10 @@ export default class CoinTrader {
       try {
         console.log("30 seconds elapsed. Selling as a fallback...");
         this.isPlacingSale = true;
-        await this.sell();
+        if (await this.sell()) {
+          await this.cleanupAfterSale();
+          await this.sleep(3000);
+        }
         this.isPlacingSale = false;
       } catch (error) {
         console.error("Error while attempting to sell after timeout:", error);

@@ -62,7 +62,7 @@ export default class CoinMonitor {
       const trade: Trade = data;
       await this.handleTrade(trader, trade);
 
-      if (trader.shouldTerminate) {
+      if (!trader || trader.shouldTerminate) {
         socket.disconnect();
       }
     });
