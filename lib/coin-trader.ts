@@ -258,7 +258,7 @@ export default class CoinTrader {
 
     const volumeThreshold = 100_000_000_000_000;
     const momentumThreshold = 7;
-    const priceImpactThreshold = 0.01;
+    const priceImpactThreshold = 0.009;
 
     const volumeMetric = trade.token_amount > volumeThreshold;
     const momentumMetric = this.calculateMomentum() > momentumThreshold;
