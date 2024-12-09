@@ -70,7 +70,7 @@ export default class CoinTrader {
         this.pumpFun.keypair,
         [],
         {
-          maxRetries: 5,
+          maxRetries: 10,
           skipPreflight: true,
           commitment: "processed",
         },
