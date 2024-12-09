@@ -28,8 +28,8 @@ export default class CoinTrader {
   private associatedUserAddress: PublicKey | null = null;
   private tradeStartTime?: Date;
 
-  private readonly computeUnits = 400_000;
-  private readonly priorityFee = 50000; // 0.000005 SOL as priority fee
+  private readonly computeUnits = 200_000; // default is 140,000
+  private readonly priorityFee = 8000; // 0.000008 SOL as priority fee
   private readonly positionAmount = 500 * 1_000_000_000; // 500k tokens
   private readonly startingMarketCap = 7000;
   private readonly pumpFunAuthority =
