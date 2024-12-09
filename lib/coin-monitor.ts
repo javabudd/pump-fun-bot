@@ -48,8 +48,6 @@ export default class CoinMonitor {
       socket.emit("joinTradeRoom", { mint: coin.mint });
 
       await trader.startSniper();
-
-      console.log(`Joined trade room for mint: ${coin.mint}`);
     });
 
     socket.on("tradeCreated", async (data) => {
