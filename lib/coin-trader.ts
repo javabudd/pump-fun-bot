@@ -236,6 +236,8 @@ export default class CoinTrader {
         });
 
       console.log(`Sell transaction successful: ${transaction}`);
+
+      await this.sleep(5000);
     } catch {
       console.error("Sell transaction failed!");
     }
