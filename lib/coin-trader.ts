@@ -153,6 +153,7 @@ export default class CoinTrader {
         .signers([this.pumpFun.keypair])
         .rpc({
           maxRetries: 5,
+          commitment: "confirmed",
           skipPreflight: true,
         });
 
