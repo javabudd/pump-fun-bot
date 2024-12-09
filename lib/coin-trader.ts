@@ -381,7 +381,7 @@ export default class CoinTrader {
     );
 
     try {
-      const transactionSignature = await closeAccount(
+      await closeAccount(
         this.pumpFun.connection,
         this.pumpFun.keypair,
         this.associatedUserAddress,
@@ -391,7 +391,6 @@ export default class CoinTrader {
 
       console.log(
         `Successfully closed associated token account: ${this.associatedUserAddress.toBase58()}`,
-        `Transaction signature: ${transactionSignature}`,
       );
 
       // Reset associated user address to null after cleanup
