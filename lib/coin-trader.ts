@@ -142,26 +142,6 @@ export default class CoinTrader {
     }
 
     try {
-      await this.pumpFun.anchorProgram.account.global.fetch(
-        this.pumpFun.global.pda,
-      );
-    } catch {
-      console.log("Initializing global account...");
-
-      await this.pumpFun.anchorProgram.methods
-        .initialize()
-        .accounts({
-          global: this.pumpFun.global.pda,
-          user: this.pumpFun.keypair.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([this.pumpFun.keypair])
-        .rpc();
-
-      console.log("Global account initialized.");
-    }
-
-    try {
       await this.ensureAtaInitialized();
     } catch (error) {
       console.error(error);
