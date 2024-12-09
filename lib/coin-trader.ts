@@ -172,6 +172,7 @@ export default class CoinTrader {
         .signers([this.pumpFun.keypair])
         .rpc({
           maxRetries: 5,
+          skipPreflight: true,
         });
 
       console.log(`Buy transaction successful: ${transaction}`);
@@ -231,8 +232,9 @@ export default class CoinTrader {
         })
         .signers([this.pumpFun.keypair])
         .rpc({
-          maxRetries: 10,
+          maxRetries: 5,
           commitment: "confirmed",
+          skipPreflight: true,
         });
 
       console.log(`Sell transaction successful: ${transaction}`);
