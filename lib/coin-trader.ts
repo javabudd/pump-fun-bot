@@ -314,7 +314,7 @@ export default class CoinTrader {
 
   private async ensureAtaInitialized(
     associatedUserAddress: PublicKey,
-    maxAttempts = 10,
+    maxAttempts = 15,
   ): Promise<void> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const ataInfo = await this.pumpFun.connection.getAccountInfo(
