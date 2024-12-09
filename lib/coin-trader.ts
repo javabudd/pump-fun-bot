@@ -176,12 +176,6 @@ export default class CoinTrader {
   }
 
   private async sell(slippageTolerance: number = 0.05): Promise<void> {
-    if (this.isPlacingSale) {
-      return;
-    }
-
-    this.isPlacingSale = true;
-
     const mint = new PublicKey(this.coin.mint);
 
     const associatedUserAddress = getAssociatedTokenAddressSync(
@@ -232,10 +226,8 @@ export default class CoinTrader {
 
       this.hasPosition = false;
       this.shouldTerminate = true;
-      this.isPlacingSale = false;
     } catch (error) {
       console.error("Sell transaction failed:", error);
-      this.isPlacingSale = false;
     }
   }
 
@@ -243,6 +235,8 @@ export default class CoinTrader {
     const maxRetries = 5;
     const initialSlippage = 0.05;
     const slippageIncrement = 0.05;
+
+    this.isPlacingSale = true;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       const currentSlippage =
@@ -255,6 +249,9 @@ export default class CoinTrader {
         await this.sleep(5000);
       }
     }
+
+    this.isPlacingSale = false;
+
     console.error("Failed to execute sell after retries.");
   }
 
@@ -267,7 +264,7 @@ export default class CoinTrader {
   }
 
   private async attemptSniperSell(trade: Trade): Promise<void> {
-    if (!this.hasPosition) {
+    if (!this.hasPosition || this.isPlacingSale) {
       return;
     }
 
@@ -278,7 +275,7 @@ export default class CoinTrader {
     const momentumThreshold = 4;
 
     if (currentVolume > volumeThreshold || momentum > momentumThreshold) {
-      await this.sell();
+      await this.retrySell();
     }
   }
 
