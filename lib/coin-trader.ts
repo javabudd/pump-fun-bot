@@ -142,7 +142,7 @@ export default class CoinTrader {
     }
 
     try {
-      await this.ensureAtaInitialized();
+      await this.ensureAtaInitialized(7);
     } catch (error) {
       console.error(error);
 
