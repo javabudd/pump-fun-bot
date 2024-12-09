@@ -243,7 +243,7 @@ export default class CoinTrader {
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
 
-    const volumeThreshold = 1_000_000_000_000;
+    const volumeThreshold = 10_000_000_000_000;
     const momentumThreshold = 4;
     const priceImpactThreshold = 0.02;
 
