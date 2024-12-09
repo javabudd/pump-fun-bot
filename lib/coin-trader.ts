@@ -243,16 +243,19 @@ export default class CoinTrader {
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
 
-    const volumeThreshold = 10_000_000_000_000;
+    const volumeThreshold = 100_000_000_000_000;
     const momentumThreshold = 4;
     const priceImpactThreshold = 0.02;
 
-    if (
-      trade.token_amount > volumeThreshold ||
-      this.calculateMomentum() > momentumThreshold ||
+    const volumeMetric = trade.token_amount > volumeThreshold;
+    const momentumMetric = this.calculateMomentum() > momentumThreshold;
+    const priceChangeMetric =
       Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore) >
-        priceImpactThreshold
-    ) {
+      priceImpactThreshold;
+
+    if (volumeMetric || momentumMetric || priceChangeMetric) {
+      console.log({ volumeMetric, momentumMetric, priceChangeMetric });
+
       try {
         await this.sell();
       } catch (error) {
@@ -275,7 +278,10 @@ export default class CoinTrader {
   }
 
   private calculateMomentum(): number {
-    const prices = this.trades.slice(-20).map((t) => t.usd_market_cap);
+    const tradeCount = this.trades.length;
+    const lookback = Math.min(50, Math.max(10, Math.floor(tradeCount / 5)));
+    const prices = this.trades.slice(-lookback).map((t) => t.usd_market_cap);
+
     return (prices[prices.length - 1] - prices[0]) / prices[0];
   }
 
