@@ -47,7 +47,11 @@ export default class CoinMonitor {
 
       socket.emit("joinTradeRoom", { mint: coin.mint });
 
-      await trader.startSniper();
+      const started = await trader.startSniper();
+
+      if (!started) {
+        socket.disconnect();
+      }
     });
 
     socket.on("tradeCreated", async (data) => {
@@ -61,6 +65,7 @@ export default class CoinMonitor {
       if (trader.shouldTerminate) {
         delete this.monitoredCoins[coin.mint];
         trader = null;
+        socket.disconnect();
       }
     });
 

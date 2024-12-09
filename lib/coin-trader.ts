@@ -40,15 +40,15 @@ export default class CoinTrader {
     this.coin = coin;
   }
 
-  public async startSniper(): Promise<void> {
+  public async startSniper(): Promise<boolean> {
     console.log(
       `Initiating sniper for ${this.coin.name} (${this.coin.mint})...`,
     );
 
     if (this.coin.usd_market_cap <= this.startingMarketCap) {
-      await this.buy();
+      return this.buy();
     } else {
-      return;
+      return false;
     }
   }
 
@@ -58,7 +58,7 @@ export default class CoinTrader {
     await this.attemptSniperSell(trade);
   }
 
-  private async buy(): Promise<void> {
+  private async buy(): Promise<boolean> {
     const url = `https://pump.fun/coin/${this.coin.mint}`;
 
     console.log(`Executing buy for ${this.coin.name} at ${url}...`);
@@ -94,7 +94,7 @@ export default class CoinTrader {
         ]);
       } catch {
         console.error("Associated token account creation failed!");
-        return;
+        return false;
       }
 
       await this.sleep(100);
@@ -167,8 +167,12 @@ export default class CoinTrader {
 
       this.tradeStartTime = new Date();
       this.hasPosition = true;
+
+      return true;
     } catch {
       console.error("Buy transaction failed!");
+
+      return false;
     }
   }
 
