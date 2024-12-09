@@ -103,6 +103,9 @@ export default class CoinTrader {
       await this.pumpFun.connection.sendTransaction(transaction, [
         this.pumpFun.keypair,
       ]);
+
+      await this.sleep(100);
+
       console.log(
         "Associated token account created:",
         associatedUserAddress.toBase58(),
@@ -268,7 +271,7 @@ export default class CoinTrader {
       return;
     }
 
-    if (trade.usd_market_cap > 10000) {
+    if (trade.usd_market_cap > 15000) {
       await this.sell();
     }
   }
