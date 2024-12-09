@@ -63,8 +63,6 @@ export default class CoinMonitor {
       await this.handleTrade(trader, trade);
 
       if (trader.shouldTerminate) {
-        delete this.monitoredCoins[coin.mint];
-        trader = null;
         socket.disconnect();
       }
     });
