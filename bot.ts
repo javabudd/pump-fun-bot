@@ -35,6 +35,7 @@ type GlobalAccount = {
     connection = new Connection(walletUrl, {
       commitment: "confirmed",
       wsEndpoint: websocketUrl,
+      confirmTransactionInitialTimeout: 100000,
     });
 
     const key = process.env.SOL_PRIVATE_KEY ?? "";
