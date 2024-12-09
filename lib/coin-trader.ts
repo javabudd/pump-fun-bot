@@ -141,14 +141,6 @@ export default class CoinTrader {
     );
 
     try {
-      await this.ensureAtaInitialized(7);
-    } catch (error) {
-      console.error(error);
-
-      return false;
-    }
-
-    try {
       console.log("Executing buy transaction...");
 
       const transaction = await this.pumpFun.anchorProgram.methods
@@ -175,7 +167,7 @@ export default class CoinTrader {
         .signers([this.pumpFun.keypair])
         .rpc({
           maxRetries: 5,
-          commitment: "confirmed",
+          commitment: "processed",
           skipPreflight: true,
         });
 
