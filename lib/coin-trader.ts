@@ -21,6 +21,7 @@ export default class CoinTrader {
   private trades: Array<Trade> = [];
   private timeoutHandle?: NodeJS.Timeout;
   private isPlacingSale = false;
+  private hasPosition = false;
 
   private readonly positionAmount = 500 * 1_000_000_000; // 500k tokens
   private readonly startingMarketCap = 7000;
@@ -170,6 +171,8 @@ export default class CoinTrader {
         });
 
       console.log(`Buy transaction successful: ${transaction}`);
+
+      this.hasPosition = true;
     } catch (error) {
       console.error("Buy transaction failed:", error);
     }
@@ -243,7 +246,7 @@ export default class CoinTrader {
   }
 
   private async attemptSniperSell(trade: Trade): Promise<void> {
-    if (this.isPlacingSale) {
+    if (!this.hasPosition || this.isPlacingSale) {
       return;
     }
 
