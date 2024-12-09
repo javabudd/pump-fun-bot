@@ -176,7 +176,7 @@ export default class CoinTrader {
         .signers([this.pumpFun.keypair])
         .rpc({
           maxRetries: 5,
-          commitment: "confirmed",
+          commitment: "processed",
           skipPreflight: true,
         });
 
@@ -243,8 +243,8 @@ export default class CoinTrader {
         })
         .signers([this.pumpFun.keypair])
         .rpc({
-          maxRetries: 10,
-          commitment: "finalized",
+          maxRetries: 3,
+          commitment: "confirmed",
           skipPreflight: true,
         });
 
