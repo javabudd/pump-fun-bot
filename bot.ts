@@ -20,10 +20,14 @@ type GlobalAccount = {
   const url: string = "wss://prod-v2.nats.realtime.pump.fun/";
 
   let walletUrl: string = "https://api.mainnet-beta.solana.com";
-  const websocketUrl = "wss://api.mainnet-beta.solana.com";
+  let websocketUrl = "wss://api.mainnet-beta.solana.com";
 
   if (process.env.WALLET_RPC_URL) {
     walletUrl = process.env.WALLET_RPC_URL;
+  }
+
+  if (process.env.WALLET_WEBSOCKET_URL) {
+    websocketUrl = process.env.WALLET_WEBSOCKET_URL;
   }
 
   const bondingCurveId = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
