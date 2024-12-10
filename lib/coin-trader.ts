@@ -303,11 +303,11 @@ export default class CoinTrader {
 
     // Calculate EMA and momentum threshold
     const prices = this.trades.map((t) => t.usd_market_cap);
-    const emaMomentum = this.calculateEMA(prices, 10); // 10-period EMA
+    const emaMomentum = this.calculateEMA(prices, 20); // 20-period EMA
     const averageEMA =
       this.trades.slice(-50).reduce((sum, t) => sum + t.usd_market_cap, 0) / 50;
 
-    const momentumThreshold = averageEMA * 1.2; // 20% above average
+    const momentumThreshold = averageEMA * 1.3; // 30% above average
     const momentumMetric = emaMomentum > momentumThreshold;
 
     // Price change metric
