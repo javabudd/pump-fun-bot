@@ -283,35 +283,41 @@ export default class CoinTrader {
       return;
     }
 
+    if (this.trades.length < 10) {
+      console.warn("Not enough historical data for metric calculations.");
+      return;
+    }
+
     const sleepAfterSell = 2000;
     const timeoutSeconds = 45;
 
+    const marketCaps = this.trades.map((t) => t.usd_market_cap);
+    const emaPeriod = 30;
+
+    // Calculate EMA Momentum and dynamic threshold
+    const emaMomentum = this.calculateEMA(marketCaps, emaPeriod); // 30-period EMA
+    const volatility = this.calculateVolatility(marketCaps);
+    const emaGrowthTarget = 1.2 + volatility * 0.5; // Adjust target by volatility
+    const thresholdHistory = this.trades
+      .slice(-50)
+      .map((t) => t.usd_market_cap * emaGrowthTarget);
+    const smoothedThreshold = this.calculateEMA(thresholdHistory, emaPeriod);
+
+    const momentumMetric = emaMomentum > smoothedThreshold;
+
+    // Volume Metric
+    const averageVolume =
+      this.trades.slice(-50).reduce((sum, t) => sum + t.token_amount, 0) / 50;
+    const dynamicVolumeThreshold = averageVolume * (3 + volatility * 2); // Adjust by volatility
+    const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
+
+    // Price Change Metric
     const solPriceBefore =
       trade.virtual_sol_reserves / trade.virtual_token_reserves;
     const solPriceAfter =
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
-
-    // Calculate average volume and volume threshold
-    const averageVolume =
-      this.trades
-        .slice(-50) // Last 50 trades
-        .reduce((sum, t) => sum + t.token_amount, 0) / 50;
-
-    const volumeThreshold = averageVolume * 3;
-    const volumeMetric = trade.token_amount > volumeThreshold;
-
-    // Calculate EMA and momentum threshold
-    const prices = this.trades.map((t) => t.usd_market_cap);
-    const emaMomentum = this.calculateEMA(prices, 20); // 20-period EMA
-    const averageEMA =
-      this.trades.slice(-50).reduce((sum, t) => sum + t.usd_market_cap, 0) / 50;
-
-    const momentumThreshold = averageEMA * 1.3; // 30% above average
-    const momentumMetric = emaMomentum > momentumThreshold;
-
-    // Price change metric
-    const priceChangeThreshold = 0.01; // 1%
+    const priceChangeThreshold = 0.05; // 5%
     const priceChangeMetric =
       Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore) >
         priceChangeThreshold && this.isSustainedPriceChange();
@@ -437,5 +443,24 @@ export default class CoinTrader {
       recentPrices[recentPrices.length - 1] / Math.min(...recentPrices);
 
     return initialDrop < recoveryThreshold && recovery > recoveryThreshold;
+  }
+
+  private calculateVolatility(data: number[]): number {
+    if (data.length === 0) {
+      return 0; // No volatility for empty data
+    }
+
+    // Step 1: Calculate the mean
+    const mean = data.reduce((sum, value) => sum + value, 0) / data.length;
+
+    // Step 2: Calculate the squared differences from the mean
+    const squaredDiffs = data.map((value) => Math.pow(value - mean, 2));
+
+    // Step 3: Calculate the variance (mean of squared differences)
+    const variance =
+      squaredDiffs.reduce((sum, value) => sum + value, 0) / data.length;
+
+    // Step 4: Return the standard deviation (square root of variance)
+    return Math.sqrt(variance);
   }
 }
