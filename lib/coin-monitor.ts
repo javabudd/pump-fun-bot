@@ -7,7 +7,7 @@ import { PumpFun } from "../types/pump-fun";
 export default class CoinMonitor {
   private readonly pumpFunSocketIoUrl = "https://frontend-api.pump.fun";
 
-  private maximumMonitoredCoins = 1;
+  private maximumMonitoredCoins = 2;
   private monitoredCoins: Record<string, Coin> = {};
   private trippedMonitoredCoins: Record<string, Trade> = {};
 

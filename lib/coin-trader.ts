@@ -157,14 +157,6 @@ export default class CoinTrader {
     );
 
     try {
-      await this.ensureAtaInitialized(12);
-    } catch (error) {
-      console.error(error);
-
-      return false;
-    }
-
-    try {
       console.log("Executing buy transaction...");
 
       const transaction = await this.pumpFun.anchorProgram.methods
@@ -202,8 +194,8 @@ export default class CoinTrader {
       this.hasPosition = true;
 
       return true;
-    } catch {
-      console.error("Buy transaction failed!");
+    } catch (error) {
+      console.error("Buy transaction failed: ", error);
 
       return false;
     }
