@@ -292,15 +292,29 @@ export default class CoinTrader {
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
 
-    const volumeThreshold = 100_000_000_000_000;
-    const momentumThreshold = 8;
-    const priceImpactThreshold = 0.009;
+    // Calculate average volume and volume threshold
+    const averageVolume =
+      this.trades
+        .slice(-50) // Last 50 trades
+        .reduce((sum, t) => sum + t.token_amount, 0) / 50;
 
+    const volumeThreshold = averageVolume * 3;
     const volumeMetric = trade.token_amount > volumeThreshold;
-    const momentumMetric = this.calculateMomentum() > momentumThreshold;
+
+    // Calculate EMA and momentum threshold
+    const prices = this.trades.map((t) => t.usd_market_cap);
+    const emaMomentum = this.calculateEMA(prices, 10); // 10-period EMA
+    const averageEMA =
+      this.trades.slice(-50).reduce((sum, t) => sum + t.usd_market_cap, 0) / 50;
+
+    const momentumThreshold = averageEMA * 1.2; // 20% above average
+    const momentumMetric = emaMomentum > momentumThreshold;
+
+    // Price change metric
+    const priceChangeThreshold = 0.01; // 1%
     const priceChangeMetric =
       Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore) >
-      priceImpactThreshold;
+        priceChangeThreshold && this.isSustainedPriceChange();
 
     if (volumeMetric || momentumMetric || priceChangeMetric) {
       console.log({ volumeMetric, momentumMetric, priceChangeMetric });
@@ -336,14 +350,6 @@ export default class CoinTrader {
         console.error("Error while attempting to sell after timeout:", error);
       }
     }
-  }
-
-  private calculateMomentum(): number {
-    const tradeCount = this.trades.length;
-    const lookback = Math.min(50, Math.max(10, Math.floor(tradeCount / 5)));
-    const prices = this.trades.slice(-lookback).map((t) => t.usd_market_cap);
-
-    return (prices[prices.length - 1] - prices[0]) / prices[0];
   }
 
   private async ensureAtaInitialized(maxAttempts = 5): Promise<void> {
@@ -409,5 +415,27 @@ export default class CoinTrader {
     const feeBasisPoints = new BN(data.slice(16, 20), "le"); // u32
 
     return { virtualTokenReserves, virtualSolReserves, feeBasisPoints };
+  }
+
+  private calculateEMA(data: number[], period: number): number {
+    const k = 2 / (period + 1);
+    return data.reduce(
+      (prev, curr, idx) => (idx === 0 ? curr : curr * k + prev * (1 - k)),
+      0,
+    );
+  }
+
+  private isSustainedPriceChange(): boolean {
+    const lookback = 20; // Last 20 trades
+    const recentPrices = this.trades
+      .slice(-lookback)
+      .map((t) => t.usd_market_cap);
+
+    const recoveryThreshold = 0.95; // 95% recovery
+    const initialDrop = Math.min(...recentPrices) / recentPrices[0];
+    const recovery =
+      recentPrices[recentPrices.length - 1] / Math.min(...recentPrices);
+
+    return initialDrop < recoveryThreshold && recovery > recoveryThreshold;
   }
 }
