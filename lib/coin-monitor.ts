@@ -7,12 +7,15 @@ import { PumpFun } from "../types/pump-fun";
 export default class CoinMonitor {
   private readonly pumpFunSocketIoUrl = "https://frontend-api.pump.fun";
 
-  private maximumMonitoredCoins = 2;
   private monitoredCoins: Record<string, Coin> = {};
   private trippedMonitoredCoins: Record<string, Trade> = {};
 
-  public constructor(private readonly pumpFun: PumpFun) {
+  public constructor(
+    private readonly pumpFun: PumpFun,
+    private readonly maximumMonitoredCoins = 1,
+  ) {
     this.pumpFun = pumpFun;
+    this.maximumMonitoredCoins = maximumMonitoredCoins;
   }
 
   public startCoinMonitor(newToken: Coin): void {
