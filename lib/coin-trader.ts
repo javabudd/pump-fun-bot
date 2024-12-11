@@ -365,17 +365,17 @@ export default class CoinTrader {
     const shouldSell =
       volumeMetric || priceChangeMetric || communityEngagementMetric;
 
-    console.log({
-      volumeMetric,
-      priceChangeMetric,
-      communityEngagementMetric,
-      thresholds: {
-        volumeThreshold,
-        priceChangeThreshold,
-      },
-    });
-
     if (shouldSell) {
+      console.log({
+        volumeMetric,
+        priceChangeMetric,
+        communityEngagementMetric,
+        thresholds: {
+          volumeThreshold,
+          priceChangeThreshold,
+        },
+      });
+
       try {
         this.isPlacingSale = true;
         if (await this.sell()) await this.sleep(sleepAfterSell);
