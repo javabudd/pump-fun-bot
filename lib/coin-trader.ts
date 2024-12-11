@@ -339,7 +339,7 @@ export default class CoinTrader {
     const shouldSell = volumeMetric || priceChangeMetric || momentumMetric;
 
     if (shouldSell) {
-      const scale = 1000;
+      const scale = 10000;
       const logVolume = trade.token_amount / scale;
       const logDynamicVolumeThreshold = dynamicVolumeThreshold / scale;
 
