@@ -283,65 +283,29 @@ export default class CoinTrader {
       return;
     }
 
-    if (this.trades.length < 10) {
-      console.warn(
-        "Not enough historical data for metric calculations. Using fallback thresholds.",
-      );
-
-      const solPriceBefore =
-        trade.virtual_sol_reserves / trade.virtual_token_reserves;
-      const solPriceAfter =
-        (trade.virtual_sol_reserves + trade.sol_amount) /
-        (trade.virtual_token_reserves + trade.token_amount);
-
-      const volumeMetricFallback = trade.token_amount > 100000000000000; // Static fallback
-      const priceIncreaseFallback =
-        trade.sol_amount -
-          (this.trades[this.trades.length - 1]?.sol_amount || 0) >
-        0.002; // Static price increase
-      const priceChangeFallback =
-        Math.abs(solPriceAfter - solPriceBefore) / solPriceBefore > 0.05; // 5% price change
-
-      if (
-        volumeMetricFallback ||
-        priceIncreaseFallback ||
-        priceChangeFallback
-      ) {
-        console.log("Fallback sell triggered due to sparse data.");
-        console.log({
-          volumeMetricFallback,
-          priceIncreaseFallback,
-          priceChangeFallback,
-        });
-        this.isPlacingSale = true;
-        if (await this.sell()) {
-          await this.sleep(2000);
-        }
-        this.isPlacingSale = false;
-        return;
-      }
-      return;
-    }
-
     const sleepAfterSell = 2000;
     const timeoutSeconds = 45;
 
-    // Dynamic thresholds based on trade data
+    // Step 1: Calculate Dynamic Volume Threshold (Retained)
+    const recentTrades = this.trades.slice(-50);
     const avgVolume =
-      this.trades.slice(-50).reduce((sum, t) => sum + t.token_amount, 0) / 50 ||
-      1;
-
-    const volumeThreshold = avgVolume * 10; // High-volume threshold
+      recentTrades.reduce((sum, t) => sum + t.token_amount, 0) /
+      (recentTrades.length || 1);
     const marketCapVolatilityFactor =
       trade.usd_market_cap < 50_000
-        ? 1.5
+        ? 5
         : trade.usd_market_cap < 100_000
-          ? 1.2
+          ? 2.5
           : 1;
+    const dynamicVolumeThreshold = avgVolume * marketCapVolatilityFactor;
 
-    const priceChangeThreshold =
-      0.01 +
-      this.calculateVolatility(this.trades.map((t) => t.sol_amount)) * 0.01;
+    const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
+
+    // Step 2: Enhanced Price Change Detection
+    const volatility = this.calculateVolatility(
+      recentTrades.map((t) => t.sol_amount),
+    );
+    const dynamicPriceChangeThreshold = 0.01 + volatility * 0.02; // Base + volatility adjustment
 
     const solPriceBefore =
       trade.virtual_sol_reserves / trade.virtual_token_reserves;
@@ -349,36 +313,44 @@ export default class CoinTrader {
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
 
-    // Metrics
-    const volumeMetric =
-      trade.token_amount > volumeThreshold * marketCapVolatilityFactor;
-    const priceChangeMetric =
-      Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore) >
-      priceChangeThreshold;
+    const priceChange = Math.abs(
+      (solPriceAfter - solPriceBefore) / solPriceBefore,
+    );
+    const priceChangeMetric = priceChange > dynamicPriceChangeThreshold;
 
-    const communityEngagementMetric =
-      trade.reply_count > 2000 &&
-      trade.last_reply &&
-      trade.last_reply > Date.now() - 3600 * 1000;
+    // Step 3: Assess Momentum
+    const shortTermTrend = this.calculateEMA(
+      this.trades.slice(-10).map((t) => t.sol_amount),
+      5,
+    );
+    const longTermTrend = this.calculateEMA(
+      this.trades.map((t) => t.sol_amount),
+      20,
+    );
+    const momentumMetric = shortTermTrend > longTermTrend * 3; // Significant upward trend
 
-    // Combine metrics
-    const shouldSell =
-      volumeMetric || priceChangeMetric || communityEngagementMetric;
+    // Step 4: Combine Metrics
+    const shouldSell = volumeMetric || priceChangeMetric || momentumMetric;
 
     if (shouldSell) {
       console.log({
-        volumeMetric,
-        priceChangeMetric,
-        communityEngagementMetric,
-        thresholds: {
-          volumeThreshold,
-          priceChangeThreshold,
+        triggeredMetrics: {
+          volumeMetric,
+          priceChangeMetric,
+          momentumMetric,
         },
+        thresholds: {
+          dynamicVolumeThreshold,
+          dynamicPriceChangeThreshold,
+        },
+        trends: { shortTermTrend, longTermTrend },
       });
 
       try {
         this.isPlacingSale = true;
-        if (await this.sell()) await this.sleep(sleepAfterSell);
+        if (await this.sell()) {
+          await this.sleep(sleepAfterSell);
+        }
         this.isPlacingSale = false;
       } catch (error) {
         console.error("Error while attempting to sell:", error);
