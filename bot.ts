@@ -85,7 +85,7 @@ type GlobalAccount = {
     anchorProgram,
   };
 
-  const monitor = new CoinMonitor(pumpFun);
+  const monitor = new CoinMonitor(pumpFun, 2);
 
   try {
     const nc: NatsConnection = await connect({
