@@ -294,7 +294,7 @@ export default class CoinTrader {
         (trade.virtual_sol_reserves + trade.sol_amount) /
         (trade.virtual_token_reserves + trade.token_amount);
 
-      const volumeMetricFallback = trade.token_amount > 100000000; // Static fallback
+      const volumeMetricFallback = trade.token_amount > 500000000; // Static fallback
       const priceIncreaseFallback =
         trade.sol_amount -
           (this.trades[this.trades.length - 1]?.sol_amount || 0) >
@@ -329,9 +329,9 @@ export default class CoinTrader {
     // Calculate EMA Momentum and dynamic threshold
     const prices = this.trades.map((t) => t.sol_amount);
     const volatility = this.calculateVolatility(prices);
-    const emaPeriod = 20; // Smoother EMA
+    const emaPeriod = 20;
     const emaMomentum = this.calculateEMA(prices, emaPeriod);
-    const emaGrowthTarget = 1.1 + volatility * 0.2; // Conservative adjustment
+    const emaGrowthTarget = 1.1 + volatility * 0.1;
     const smoothedThreshold = this.calculateEMA(
       this.trades.slice(-50).map((t) => t.sol_amount * emaGrowthTarget),
       emaPeriod,
@@ -344,7 +344,7 @@ export default class CoinTrader {
       lastTrades.reduce((sum, t) => sum + t.token_amount, 0) /
       lastTrades.length;
     const cappedVolatility = Math.min(volatility, 1);
-    const dynamicVolumeThreshold = averageVolume * (3 + cappedVolatility);
+    const dynamicVolumeThreshold = averageVolume * (13 + cappedVolatility);
     const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
 
     // Price Change Metric
@@ -353,7 +353,7 @@ export default class CoinTrader {
     const solPriceAfter =
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
-    const dynamicPriceThreshold = 0.02 + volatility * 0.01;
+    const dynamicPriceThreshold = 0.015 + volatility * 0.01;
     const priceChangeMetric =
       Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore) >
         dynamicPriceThreshold && this.isSustainedPriceChange();
