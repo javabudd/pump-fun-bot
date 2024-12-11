@@ -291,16 +291,16 @@ export default class CoinTrader {
     const sleepAfterSell = 2000;
     const timeoutSeconds = 45;
 
-    const marketCaps = this.trades.map((t) => t.usd_market_cap);
-    const emaPeriod = 30;
+    const prices = this.trades.map((t) => t.sol_amount);
+    const emaPeriod = 20;
 
     // Calculate EMA Momentum and dynamic threshold
-    const emaMomentum = this.calculateEMA(marketCaps, emaPeriod); // 30-period EMA
-    const volatility = this.calculateVolatility(marketCaps);
-    const emaGrowthTarget = 1.2 + volatility * 0.5; // Adjust target by volatility
+    const emaMomentum = this.calculateEMA(prices, emaPeriod); // 30-period EMA
+    const volatility = this.calculateVolatility(prices);
+    const emaGrowthTarget = 1.2 + volatility * 0.3; // Adjust target by volatility
     const thresholdHistory = this.trades
       .slice(-50)
-      .map((t) => t.usd_market_cap * emaGrowthTarget);
+      .map((t) => t.sol_amount * emaGrowthTarget);
     const smoothedThreshold = this.calculateEMA(thresholdHistory, emaPeriod);
 
     const momentumMetric = emaMomentum > smoothedThreshold;
@@ -310,7 +310,7 @@ export default class CoinTrader {
     const averageVolume =
       lastTrades.reduce((sum, t) => sum + t.token_amount, 0) /
       lastTrades.length;
-    const dynamicVolumeThreshold = averageVolume * (3 + volatility * 2); // Adjust by volatility
+    const dynamicVolumeThreshold = averageVolume * (2 + volatility);
     const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
 
     // Price Change Metric
@@ -319,7 +319,7 @@ export default class CoinTrader {
     const solPriceAfter =
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
-    const priceChangeThreshold = 0.04; // 4%
+    const priceChangeThreshold = 0.03; // 3%
     const priceChangeMetric =
       Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore) >
         priceChangeThreshold && this.isSustainedPriceChange();
@@ -435,9 +435,7 @@ export default class CoinTrader {
 
   private isSustainedPriceChange(): boolean {
     const lookback = 20; // Last 20 trades
-    const recentPrices = this.trades
-      .slice(-lookback)
-      .map((t) => t.usd_market_cap);
+    const recentPrices = this.trades.slice(-lookback).map((t) => t.sol_amount);
 
     const recoveryThreshold = 0.95; // 95% recovery
     const initialDrop = Math.min(...recentPrices) / recentPrices[0];
