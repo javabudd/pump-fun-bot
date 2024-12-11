@@ -331,7 +331,7 @@ export default class CoinTrader {
       this.trades.slice(-50).reduce((sum, t) => sum + t.token_amount, 0) / 50 ||
       1;
 
-    const volumeThreshold = avgVolume * 6; // High-volume threshold
+    const volumeThreshold = avgVolume * 10; // High-volume threshold
     const marketCapVolatilityFactor =
       trade.usd_market_cap < 50_000
         ? 1.5
