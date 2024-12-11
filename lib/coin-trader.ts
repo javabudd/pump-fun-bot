@@ -284,41 +284,70 @@ export default class CoinTrader {
     }
 
     if (this.trades.length < 10) {
-      console.warn("Not enough historical data for metric calculations.");
+      console.warn(
+        "Not enough historical data for metric calculations. Using fallback thresholds.",
+      );
+
+      const solPriceBefore =
+        trade.virtual_sol_reserves / trade.virtual_token_reserves;
+      const solPriceAfter =
+        (trade.virtual_sol_reserves + trade.sol_amount) /
+        (trade.virtual_token_reserves + trade.token_amount);
+
+      const volumeMetricFallback = trade.token_amount > 50000000; // Static fallback
+      const priceIncreaseFallback =
+        trade.sol_amount -
+          (this.trades[this.trades.length - 1]?.sol_amount || 0) >
+        0.002; // Static price increase
+      const priceChangeFallback =
+        Math.abs(solPriceAfter - solPriceBefore) / solPriceBefore > 0.05; // 5% price change
+
+      if (
+        volumeMetricFallback ||
+        priceIncreaseFallback ||
+        priceChangeFallback
+      ) {
+        console.log("Fallback sell triggered due to sparse data.");
+        console.log({
+          volumeMetricFallback,
+          priceIncreaseFallback,
+          priceChangeFallback,
+        });
+        this.isPlacingSale = true;
+        if (await this.sell()) {
+          await this.sleep(2000);
+        }
+        this.isPlacingSale = false;
+        return;
+      }
       return;
     }
 
     const sleepAfterSell = 2000;
     const timeoutSeconds = 45;
 
-    // **Price Calculation**
-    const prices = this.trades.map((t) => t.sol_amount / t.token_amount);
+    // Calculate EMA Momentum and dynamic threshold
+    const prices = this.trades.map((t) => t.sol_amount);
     const volatility = this.calculateVolatility(prices);
-
-    // **EMA Momentum Metric**
-    const emaPeriod = 20; // Conservative smoothing
+    const emaPeriod = 20; // Smoother EMA
     const emaMomentum = this.calculateEMA(prices, emaPeriod);
     const emaGrowthTarget = 1.1 + volatility * 0.2; // Conservative adjustment
     const smoothedThreshold = this.calculateEMA(
-      prices.map((p) => p * emaGrowthTarget),
+      this.trades.slice(-50).map((t) => t.sol_amount * emaGrowthTarget),
       emaPeriod,
     );
     const momentumMetric = emaMomentum > smoothedThreshold;
 
-    // **Volume Metric**
+    // Volume Metric
     const lastTrades = this.trades.slice(-50);
-    const sortedVolumes = lastTrades
-      .map((t) => t.token_amount)
-      .sort((a, b) => a - b);
-    const medianVolume =
-      sortedVolumes[Math.floor(sortedVolumes.length / 2)] || 0;
-
-    const baseMultiplier = 2.5;
-    const adjustedMultiplier = baseMultiplier + Math.min(volatility, 0.5); // Cap volatility influence
-    const dynamicVolumeThreshold = medianVolume * adjustedMultiplier;
+    const averageVolume =
+      lastTrades.reduce((sum, t) => sum + t.token_amount, 0) /
+      lastTrades.length;
+    const cappedVolatility = Math.min(volatility, 1);
+    const dynamicVolumeThreshold = averageVolume * (2 + cappedVolatility);
     const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
 
-    // **Price Change Metric**
+    // Price Change Metric
     const solPriceBefore =
       trade.virtual_sol_reserves / trade.virtual_token_reserves;
     const solPriceAfter =
@@ -330,7 +359,16 @@ export default class CoinTrader {
         dynamicPriceThreshold && this.isSustainedPriceChange();
 
     if (volumeMetric || momentumMetric || priceChangeMetric) {
-      console.log({ volumeMetric, momentumMetric, priceChangeMetric });
+      console.log({
+        volumeMetric,
+        momentumMetric,
+        priceChangeMetric,
+        thresholds: {
+          dynamicVolumeThreshold,
+          smoothedThreshold,
+          dynamicPriceThreshold,
+        },
+      });
 
       try {
         this.isPlacingSale = true;
