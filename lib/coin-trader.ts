@@ -297,10 +297,10 @@ export default class CoinTrader {
       (recentTrades.length || 1);
     const marketCapVolatilityFactor =
       trade.usd_market_cap < 50_000
-        ? 7
+        ? 8
         : trade.usd_market_cap < 100_000
-          ? 3.5
-          : 1;
+          ? 4
+          : 2;
     const dynamicVolumeThreshold = avgVolume * marketCapVolatilityFactor;
 
     const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
@@ -339,6 +339,10 @@ export default class CoinTrader {
     const shouldSell = volumeMetric || priceChangeMetric || momentumMetric;
 
     if (shouldSell) {
+      const scale = 1000;
+      const logVolume = trade.token_amount / scale;
+      const logDynamicVolumeThreshold = dynamicVolumeThreshold / scale;
+
       console.log({
         triggeredMetrics: {
           volumeMetric,
@@ -346,9 +350,9 @@ export default class CoinTrader {
           momentumMetric,
         },
         thresholds: [
-          { volume: trade.token_amount, dynamicVolumeThreshold },
-          { priceChange, dynamicPriceChangeThreshold },
-          { shortTermTrend, longTermTrendMultiplied: longTermTrendThreshold },
+          { volume: logVolume, threshold: logDynamicVolumeThreshold },
+          { priceChange, threshold: dynamicPriceChangeThreshold },
+          { shortTermTrend, threshold: longTermTrendThreshold },
         ],
       });
 
