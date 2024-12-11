@@ -307,11 +307,15 @@ export default class CoinTrader {
 
     // **Volume Metric**
     const lastTrades = this.trades.slice(-50);
-    const averageVolume =
-      lastTrades.reduce((sum, t) => sum + t.token_amount, 0) /
-      lastTrades.length;
-    const cappedVolatility = Math.min(volatility, 1); // Cap volatility for stability
-    const dynamicVolumeThreshold = averageVolume * (2 + cappedVolatility);
+    const sortedVolumes = lastTrades
+      .map((t) => t.token_amount)
+      .sort((a, b) => a - b);
+    const medianVolume =
+      sortedVolumes[Math.floor(sortedVolumes.length / 2)] || 0;
+
+    const baseMultiplier = 2.5;
+    const adjustedMultiplier = baseMultiplier + Math.min(volatility, 0.5); // Cap volatility influence
+    const dynamicVolumeThreshold = medianVolume * adjustedMultiplier;
     const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
 
     // **Price Change Metric**
