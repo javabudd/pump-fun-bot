@@ -305,9 +305,11 @@ export default class CoinTrader {
 
     const momentumMetric = emaMomentum > smoothedThreshold;
 
+    const lastTrades = this.trades.slice(-50);
     // Volume Metric
     const averageVolume =
-      this.trades.slice(-50).reduce((sum, t) => sum + t.token_amount, 0) / 50;
+      lastTrades.reduce((sum, t) => sum + t.token_amount, 0) /
+      lastTrades.length;
     const dynamicVolumeThreshold = averageVolume * (3 + volatility * 2); // Adjust by volatility
     const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
 
@@ -317,7 +319,7 @@ export default class CoinTrader {
     const solPriceAfter =
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
-    const priceChangeThreshold = 0.05; // 5%
+    const priceChangeThreshold = 0.04; // 4%
     const priceChangeMetric =
       Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore) >
         priceChangeThreshold && this.isSustainedPriceChange();
