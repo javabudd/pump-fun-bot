@@ -297,9 +297,9 @@ export default class CoinTrader {
       (recentTrades.length || 1);
     const marketCapVolatilityFactor =
       trade.usd_market_cap < 50_000
-        ? 5
+        ? 6
         : trade.usd_market_cap < 100_000
-          ? 2.5
+          ? 3
           : 1;
     const dynamicVolumeThreshold = avgVolume * marketCapVolatilityFactor;
 
