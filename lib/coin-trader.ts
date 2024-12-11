@@ -326,55 +326,59 @@ export default class CoinTrader {
     const sleepAfterSell = 2000;
     const timeoutSeconds = 45;
 
-    // Calculate EMA Momentum and dynamic threshold
-    const prices = this.trades.map((t) => t.sol_amount);
-    const volatility = this.calculateVolatility(prices);
-    const emaPeriod = 20;
-    const emaMomentum = this.calculateEMA(prices, emaPeriod);
-    const emaGrowthTarget = 1 + volatility * 0.1;
-    const smoothedThreshold = this.calculateEMA(
-      this.trades.slice(-50).map((t) => t.sol_amount * emaGrowthTarget),
-      emaPeriod,
-    );
-    const momentumMetric = emaMomentum > smoothedThreshold;
+    // Dynamic thresholds based on trade data
+    const avgVolume =
+      this.trades.slice(-50).reduce((sum, t) => sum + t.token_amount, 0) / 50 ||
+      1;
 
-    // Volume Metric
-    const lastTrades = this.trades.slice(-50);
-    const averageVolume =
-      lastTrades.reduce((sum, t) => sum + t.token_amount, 0) /
-      lastTrades.length;
-    const cappedVolatility = Math.min(volatility, 1);
-    const dynamicVolumeThreshold = averageVolume * (18 + cappedVolatility);
-    const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
+    const volumeThreshold = avgVolume * 6; // High-volume threshold
+    const marketCapVolatilityFactor =
+      trade.usd_market_cap < 50_000
+        ? 1.5
+        : trade.usd_market_cap < 100_000
+          ? 1.2
+          : 1;
 
-    // Price Change Metric
+    const priceChangeThreshold =
+      0.01 +
+      this.calculateVolatility(this.trades.map((t) => t.sol_amount)) * 0.01;
+
     const solPriceBefore =
       trade.virtual_sol_reserves / trade.virtual_token_reserves;
     const solPriceAfter =
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
-    const dynamicPriceThreshold = 0.01 + volatility * 0.01;
+
+    // Metrics
+    const volumeMetric =
+      trade.token_amount > volumeThreshold * marketCapVolatilityFactor;
     const priceChangeMetric =
       Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore) >
-        dynamicPriceThreshold && this.isSustainedPriceChange();
+      priceChangeThreshold;
 
-    if (volumeMetric || momentumMetric || priceChangeMetric) {
-      console.log({
-        volumeMetric,
-        momentumMetric,
-        priceChangeMetric,
-        thresholds: {
-          dynamicVolumeThreshold,
-          smoothedThreshold,
-          dynamicPriceThreshold,
-        },
-      });
+    const communityEngagementMetric =
+      trade.reply_count > 2000 &&
+      trade.last_reply &&
+      trade.last_reply > Date.now() - 3600 * 1000;
 
+    // Combine metrics
+    const shouldSell =
+      volumeMetric || priceChangeMetric || communityEngagementMetric;
+
+    console.log({
+      volumeMetric,
+      priceChangeMetric,
+      communityEngagementMetric,
+      thresholds: {
+        volumeThreshold,
+        priceChangeThreshold,
+      },
+    });
+
+    if (shouldSell) {
       try {
         this.isPlacingSale = true;
-        if (await this.sell()) {
-          await this.sleep(sleepAfterSell);
-        }
+        if (await this.sell()) await this.sleep(sleepAfterSell);
         this.isPlacingSale = false;
       } catch (error) {
         console.error("Error while attempting to sell:", error);
