@@ -48,7 +48,11 @@ export default class CoinTrader {
       `Initiating sniper for ${this.coin.name} (${this.coin.mint})...`,
     );
 
-    if (this.coin.usd_market_cap <= this.startingMarketCap) {
+    if (
+      this.coin.usd_market_cap <= this.startingMarketCap &&
+      this.coin.twitter &&
+      this.coin.telegram
+    ) {
       return this.buy();
     } else {
       return false;
