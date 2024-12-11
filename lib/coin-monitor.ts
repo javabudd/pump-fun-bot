@@ -48,8 +48,6 @@ export default class CoinMonitor {
         return;
       }
 
-      socket.emit("joinTradeRoom", { mint: coin.mint });
-
       const started = await trader.startSniper();
 
       if (!started) {

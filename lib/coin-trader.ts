@@ -91,6 +91,10 @@ export default class CoinTrader {
   }
 
   public async addTrade(trade: Trade): Promise<void> {
+    if (trade.mint !== this.coin.mint) {
+      return;
+    }
+
     this.trades.push(trade);
 
     await this.attemptSniperSell(trade);
@@ -297,10 +301,10 @@ export default class CoinTrader {
       (recentTrades.length || 1);
     const marketCapVolatilityFactor =
       trade.usd_market_cap < 50_000
-        ? 10
+        ? 4
         : trade.usd_market_cap < 100_000
-          ? 5
-          : 2;
+          ? 2
+          : 1;
     const dynamicVolumeThreshold = avgVolume * marketCapVolatilityFactor;
 
     const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
@@ -339,7 +343,7 @@ export default class CoinTrader {
     const shouldSell = volumeMetric || priceChangeMetric || momentumMetric;
 
     if (shouldSell) {
-      const scale = 10000;
+      const scale = 1000000000;
       const logVolume = trade.token_amount / scale;
       const logDynamicVolumeThreshold = dynamicVolumeThreshold / scale;
 
