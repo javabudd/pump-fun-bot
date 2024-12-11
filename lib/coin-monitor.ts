@@ -48,22 +48,24 @@ export default class CoinMonitor {
         return;
       }
 
+      socket.emit("joinTradeRoom", { mint: coin.mint });
+
+      socket.on("tradeCreated", async (data) => {
+        if (!trader) {
+          return;
+        }
+
+        const trade: Trade = data;
+        await this.handleTrade(trader, trade);
+
+        if (!trader || trader.shouldTerminate) {
+          socket.disconnect();
+        }
+      });
+
       const started = await trader.startSniper();
 
       if (!started) {
-        socket.disconnect();
-      }
-    });
-
-    socket.on("tradeCreated", async (data) => {
-      if (!trader) {
-        return;
-      }
-
-      const trade: Trade = data;
-      await this.handleTrade(trader, trade);
-
-      if (!trader || trader.shouldTerminate) {
         socket.disconnect();
       }
     });
