@@ -291,38 +291,39 @@ export default class CoinTrader {
     const sleepAfterSell = 2000;
     const timeoutSeconds = 45;
 
-    const prices = this.trades.map((t) => t.sol_amount);
-    const emaPeriod = 20;
-
-    // Calculate EMA Momentum and dynamic threshold
-    const emaMomentum = this.calculateEMA(prices, emaPeriod); // 30-period EMA
+    // **Price Calculation**
+    const prices = this.trades.map((t) => t.sol_amount / t.token_amount);
     const volatility = this.calculateVolatility(prices);
-    const emaGrowthTarget = 1.2 + volatility * 0.3; // Adjust target by volatility
-    const thresholdHistory = this.trades
-      .slice(-50)
-      .map((t) => t.sol_amount * emaGrowthTarget);
-    const smoothedThreshold = this.calculateEMA(thresholdHistory, emaPeriod);
 
+    // **EMA Momentum Metric**
+    const emaPeriod = 20; // Conservative smoothing
+    const emaMomentum = this.calculateEMA(prices, emaPeriod);
+    const emaGrowthTarget = 1.1 + volatility * 0.2; // Conservative adjustment
+    const smoothedThreshold = this.calculateEMA(
+      prices.map((p) => p * emaGrowthTarget),
+      emaPeriod,
+    );
     const momentumMetric = emaMomentum > smoothedThreshold;
 
+    // **Volume Metric**
     const lastTrades = this.trades.slice(-50);
-    // Volume Metric
     const averageVolume =
       lastTrades.reduce((sum, t) => sum + t.token_amount, 0) /
       lastTrades.length;
-    const dynamicVolumeThreshold = averageVolume * (2 + volatility);
+    const cappedVolatility = Math.min(volatility, 1); // Cap volatility for stability
+    const dynamicVolumeThreshold = averageVolume * (2 + cappedVolatility);
     const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
 
-    // Price Change Metric
+    // **Price Change Metric**
     const solPriceBefore =
       trade.virtual_sol_reserves / trade.virtual_token_reserves;
     const solPriceAfter =
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
-    const priceChangeThreshold = 0.03; // 3%
+    const dynamicPriceThreshold = 0.02 + volatility * 0.01;
     const priceChangeMetric =
       Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore) >
-        priceChangeThreshold && this.isSustainedPriceChange();
+        dynamicPriceThreshold && this.isSustainedPriceChange();
 
     if (volumeMetric || momentumMetric || priceChangeMetric) {
       console.log({ volumeMetric, momentumMetric, priceChangeMetric });
@@ -336,7 +337,6 @@ export default class CoinTrader {
       } catch (error) {
         console.error("Error while attempting to sell:", error);
       }
-
       return;
     }
 
