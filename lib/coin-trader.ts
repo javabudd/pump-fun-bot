@@ -294,7 +294,7 @@ export default class CoinTrader {
         (trade.virtual_sol_reserves + trade.sol_amount) /
         (trade.virtual_token_reserves + trade.token_amount);
 
-      const volumeMetricFallback = trade.token_amount > 50000000; // Static fallback
+      const volumeMetricFallback = trade.token_amount > 100000000; // Static fallback
       const priceIncreaseFallback =
         trade.sol_amount -
           (this.trades[this.trades.length - 1]?.sol_amount || 0) >
@@ -344,7 +344,7 @@ export default class CoinTrader {
       lastTrades.reduce((sum, t) => sum + t.token_amount, 0) /
       lastTrades.length;
     const cappedVolatility = Math.min(volatility, 1);
-    const dynamicVolumeThreshold = averageVolume * (2 + cappedVolatility);
+    const dynamicVolumeThreshold = averageVolume * (3 + cappedVolatility);
     const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
 
     // Price Change Metric
