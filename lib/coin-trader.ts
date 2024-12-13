@@ -26,8 +26,8 @@ export default class CoinTrader {
   private isPlacingSale = false;
   private hasPosition = false;
   private associatedUserAddress: PublicKey | null = null;
-  private tradeStartTime?: Date;
 
+  private readonly sleepAfterSell = 2000;
   private readonly computeUnits = 200_000; // default is 140,000
   private readonly priorityFee = 900000; // 0.0009 SOL as priority fee
   private readonly positionAmount = 500 * 1_000_000_000; // 500k tokens
@@ -198,8 +198,24 @@ export default class CoinTrader {
 
       console.log(`Buy transaction successful: ${transaction}`);
 
-      this.tradeStartTime = new Date();
       this.hasPosition = true;
+
+      setTimeout(async () => {
+        try {
+          console.log(`45 seconds elapsed. Selling as a fallback...`);
+          this.isPlacingSale = true;
+          if (await this.sell()) {
+            await this.sleep();
+          }
+          this.isPlacingSale = false;
+
+          return;
+        } catch (error) {
+          console.error("Error while attempting to sell after timeout:", error);
+
+          return;
+        }
+      }, 45000);
 
       return true;
     } catch (error) {
@@ -291,9 +307,6 @@ export default class CoinTrader {
       return;
     }
 
-    const sleepAfterSell = 2000;
-    const timeoutSeconds = 45;
-
     // Step 1: Calculate Dynamic Volume Threshold (Retained)
     const recentTrades = this.trades.slice(-50);
     const avgVolume =
@@ -363,7 +376,7 @@ export default class CoinTrader {
       try {
         this.isPlacingSale = true;
         if (await this.sell()) {
-          await this.sleep(sleepAfterSell);
+          await this.sleep();
         }
         this.isPlacingSale = false;
       } catch (error) {
@@ -371,53 +384,10 @@ export default class CoinTrader {
       }
       return;
     }
-
-    if (
-      this.tradeStartTime &&
-      new Date() >=
-        new Date(this.tradeStartTime.getTime() + timeoutSeconds * 1000)
-    ) {
-      try {
-        console.log(
-          `${timeoutSeconds} seconds elapsed. Selling as a fallback...`,
-        );
-        this.isPlacingSale = true;
-        if (await this.sell()) {
-          await this.sleep(sleepAfterSell);
-        }
-        this.isPlacingSale = false;
-      } catch (error) {
-        console.error("Error while attempting to sell after timeout:", error);
-      }
-    }
   }
 
-  private async ensureAtaInitialized(maxAttempts = 5): Promise<void> {
-    if (!this.associatedUserAddress) {
-      throw new Error(
-        "ATA initialization does not have required associated user address.",
-      );
-    }
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const ataInfo = await this.pumpFun.connection.getAccountInfo(
-        this.associatedUserAddress,
-        {
-          commitment: "processed",
-        },
-      );
-
-      if (ataInfo) {
-        return;
-      }
-
-      await this.sleep(500);
-    }
-    throw new Error(`ATA initialization failed after ${maxAttempts} retries.`);
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  private sleep(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, this.sleepAfterSell));
   }
 
   private async getExpectedSolOutput(amount: number): Promise<BN> {
