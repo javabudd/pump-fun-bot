@@ -314,9 +314,9 @@ export default class CoinTrader {
       (recentTrades.length || 1);
     const marketCapVolatilityFactor =
       trade.usd_market_cap < 50_000
-        ? 4
+        ? 3
         : trade.usd_market_cap < 100_000
-          ? 2
+          ? 1.5
           : 1;
     const dynamicVolumeThreshold = avgVolume * marketCapVolatilityFactor;
 
@@ -349,7 +349,7 @@ export default class CoinTrader {
       20,
     );
 
-    const longTermTrendThreshold = longTermTrend * 3; // Significant upward trend
+    const longTermTrendThreshold = longTermTrend * 2; // Significant upward trend
     const momentumMetric = shortTermTrend > longTermTrendThreshold;
 
     // Step 4: Combine Metrics
