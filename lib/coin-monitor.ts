@@ -50,7 +50,7 @@ export default class CoinMonitor {
 
       socket.emit("joinTradeRoom", { mint: coin.mint });
 
-      socket.on("tradeCreated", async (data) => {
+      socket.on(`tradeCreated:${coin.mint}`, async (data) => {
         if (!trader) {
           return;
         }
