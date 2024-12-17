@@ -26,6 +26,7 @@ export default class CoinTrader {
   private isPlacingSale = false;
   private hasPosition = false;
   private associatedUserAddress: PublicKey | null = null;
+  private buyPrice: number | null = null;
 
   private readonly sleepAfterSell = 2000;
   private readonly computeUnits = 200_000; // default is 140,000
@@ -199,10 +200,12 @@ export default class CoinTrader {
       console.log(`Buy transaction successful: ${transaction}`);
 
       this.hasPosition = true;
+      this.buyPrice =
+        this.coin.virtual_sol_reserves / this.coin.virtual_token_reserves;
 
       setTimeout(async () => {
         try {
-          console.log(`45 seconds elapsed. Selling as a fallback...`);
+          console.log(`120 seconds elapsed. Selling as a fallback...`);
           this.isPlacingSale = true;
           if (await this.sell()) {
             await this.sleep();
@@ -215,7 +218,7 @@ export default class CoinTrader {
 
           return;
         }
-      }, 45000);
+      }, 120000);
 
       return true;
     } catch (error) {
@@ -307,53 +310,79 @@ export default class CoinTrader {
       return;
     }
 
-    // Step 1: Calculate Dynamic Volume Threshold (Retained)
-    const recentTrades = this.trades.slice(-50);
-    const avgVolume =
-      recentTrades.reduce((sum, t) => sum + t.token_amount, 0) /
-      (recentTrades.length || 1);
-    const marketCapVolatilityFactor =
-      trade.usd_market_cap < 50_000
-        ? 5
-        : trade.usd_market_cap < 100_000
-          ? 2.5
-          : 1;
-    const dynamicVolumeThreshold = avgVolume * marketCapVolatilityFactor;
+    let priceChange = 0,
+      dynamicVolumeThreshold = 0,
+      dynamicPriceChangeThreshold = 0,
+      shortTermTrend = 0,
+      longTermTrendThreshold = 0;
 
-    const volumeMetric = trade.token_amount > dynamicVolumeThreshold;
+    let shouldSell: boolean,
+      volumeMetric = false,
+      priceChangeMetric = false,
+      momentumMetric = false,
+      stopLossMetric = false;
 
-    // Step 2: Enhanced Price Change Detection
-    const volatility = this.calculateVolatility(
-      recentTrades.map((t) => t.sol_amount),
-    );
-    const dynamicPriceChangeThreshold = 0.01 + volatility * 0.02; // Base + volatility adjustment
-
-    const solPriceBefore =
-      trade.virtual_sol_reserves / trade.virtual_token_reserves;
-    const solPriceAfter =
+    const currentPrice =
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
 
-    const priceChange = Math.abs(
-      (solPriceAfter - solPriceBefore) / solPriceBefore,
-    );
-    const priceChangeMetric = priceChange > dynamicPriceChangeThreshold;
+    // Stop-loss threshold: 10% drop
+    const stopLossThreshold = this.buyPrice! * 0.9;
+    if (currentPrice < stopLossThreshold) {
+      shouldSell = true;
+      stopLossMetric = shouldSell;
+    } else {
+      // Step 1: Calculate Dynamic Volume Threshold (Retained)
+      const recentTrades = this.trades.slice(-50);
+      const avgVolume =
+        recentTrades.reduce((sum, t) => sum + t.token_amount, 0) /
+        (recentTrades.length || 1);
+      const marketCapVolatilityFactor =
+        trade.usd_market_cap < 50_000
+          ? 5
+          : trade.usd_market_cap < 100_000
+            ? 2.5
+            : 1;
 
-    // Step 3: Assess Momentum
-    const shortTermTrend = this.calculateEMA(
-      this.trades.slice(-10).map((t) => t.sol_amount),
-      5,
-    );
-    const longTermTrend = this.calculateEMA(
-      this.trades.map((t) => t.sol_amount),
-      20,
-    );
+      dynamicVolumeThreshold = avgVolume * marketCapVolatilityFactor;
 
-    const longTermTrendThreshold = longTermTrend * 2; // Significant upward trend
-    const momentumMetric = shortTermTrend > longTermTrendThreshold;
+      volumeMetric = trade.token_amount > dynamicVolumeThreshold;
 
-    // Step 4: Combine Metrics
-    const shouldSell = volumeMetric || priceChangeMetric || momentumMetric;
+      // Step 2: Enhanced Price Change Detection
+      const volatility = this.calculateVolatility(
+        recentTrades.map((t) => t.sol_amount),
+      );
+
+      dynamicPriceChangeThreshold = 0.01 + volatility * 0.02; // Base + volatility adjustment
+
+      const solPriceBefore =
+        trade.virtual_sol_reserves / trade.virtual_token_reserves;
+      const solPriceAfter =
+        (trade.virtual_sol_reserves + trade.sol_amount) /
+        (trade.virtual_token_reserves + trade.token_amount);
+
+      priceChange = Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore);
+
+      priceChangeMetric = priceChange > dynamicPriceChangeThreshold;
+
+      // Step 3: Assess Momentum
+      shortTermTrend = this.calculateEMA(
+        this.trades.slice(-10).map((t) => t.sol_amount),
+        5,
+      );
+
+      const longTermTrend = this.calculateEMA(
+        this.trades.map((t) => t.sol_amount),
+        20,
+      );
+
+      longTermTrendThreshold = longTermTrend * 2; // Significant upward trend
+
+      momentumMetric = shortTermTrend > longTermTrendThreshold;
+
+      // Step 4: Combine Metrics
+      shouldSell = volumeMetric || priceChangeMetric || momentumMetric;
+    }
 
     if (shouldSell) {
       const scale = 1000000000;
@@ -365,6 +394,7 @@ export default class CoinTrader {
           volumeMetric,
           priceChangeMetric,
           momentumMetric,
+          stopLossMetric,
         },
         thresholds: [
           { volume: logVolume, threshold: logDynamicVolumeThreshold },
