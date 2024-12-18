@@ -20,8 +20,6 @@ import { PumpFun } from "../types/pump-fun";
 import { Buffer } from "buffer";
 
 export default class CoinTrader {
-  public shouldTerminate = false;
-
   private trades: Array<Trade> = [];
   private isPlacingSale = false;
   private hasPosition = false;
@@ -44,24 +42,23 @@ export default class CoinTrader {
   }
 
   public async startSniper(): Promise<boolean> {
-    console.log(
-      `Initiating sniper for ${this.coin.name} (${this.coin.mint})...`,
-    );
-
     if (
       this.coin.usd_market_cap <= this.startingMarketCap &&
       this.coin.twitter &&
       this.coin.telegram
     ) {
+      console.log(
+        `Initiating sniper for ${this.coin.name} (${this.coin.mint})...`,
+      );
+
       return this.buy();
     } else {
       return false;
     }
   }
 
-  public async closeAccount(): Promise<void> {
+  public async closeAccount(): Promise<string | undefined> {
     if (!this.associatedUserAddress) {
-      console.warn("No associated user address found for cleanup.");
       return;
     }
 
@@ -76,28 +73,44 @@ export default class CoinTrader {
         {
           maxRetries: 10,
           skipPreflight: true,
-          commitment: "processed",
+          commitment: "confirmed",
         },
       );
     } catch {
       console.error(
         `Failed to close associated token account: ${this.associatedUserAddress?.toBase58()}`,
       );
+
+      return;
     }
 
-    console.log(
-      `Successfully closed associated token account: ${this.associatedUserAddress?.toBase58()}`,
-    );
+    return this.associatedUserAddress?.toBase58();
   }
 
-  public async addTrade(trade: Trade): Promise<void> {
+  public async addTrade(trade: Trade): Promise<boolean | undefined> {
     if (trade.mint !== this.coin.mint) {
       return;
     }
 
     this.trades.push(trade);
 
-    await this.attemptSniperSell(trade);
+    return this.attemptSniperSell(trade);
+  }
+
+  public async doSell() {
+    try {
+      this.isPlacingSale = true;
+      if (await this.sell()) {
+        await this.sleep();
+      }
+      this.isPlacingSale = false;
+    } catch (error) {
+      console.error("Error while attempting to sell:", error);
+
+      return false;
+    }
+
+    return true;
   }
 
   private async buy(): Promise<boolean> {
@@ -200,23 +213,6 @@ export default class CoinTrader {
 
       this.hasPosition = true;
 
-      setTimeout(async () => {
-        try {
-          console.log(`45 seconds elapsed. Selling as a fallback...`);
-          this.isPlacingSale = true;
-          if (await this.sell()) {
-            await this.sleep();
-          }
-          this.isPlacingSale = false;
-
-          return;
-        } catch (error) {
-          console.error("Error while attempting to sell after timeout:", error);
-
-          return;
-        }
-      }, 45000);
-
       return true;
     } catch (error) {
       console.error("Buy transaction failed: ", error);
@@ -292,17 +288,13 @@ export default class CoinTrader {
     } catch {
       console.error("Sell transaction failed!");
 
-      this.shouldTerminate = true;
-
       return false;
     }
-
-    this.shouldTerminate = true;
 
     return true;
   }
 
-  private async attemptSniperSell(trade: Trade): Promise<void> {
+  private async attemptSniperSell(trade: Trade): Promise<boolean | undefined> {
     if (!this.hasPosition || this.isPlacingSale) {
       return;
     }
@@ -355,35 +347,28 @@ export default class CoinTrader {
     // Step 4: Combine Metrics
     const shouldSell = volumeMetric || priceChangeMetric || momentumMetric;
 
-    if (shouldSell) {
-      const scale = 1000000000;
-      const logVolume = trade.token_amount / scale;
-      const logDynamicVolumeThreshold = dynamicVolumeThreshold / scale;
-
-      console.log({
-        triggeredMetrics: {
-          volumeMetric,
-          priceChangeMetric,
-          momentumMetric,
-        },
-        thresholds: [
-          { volume: logVolume, threshold: logDynamicVolumeThreshold },
-          { priceChange, threshold: dynamicPriceChangeThreshold },
-          { shortTermTrend, threshold: longTermTrendThreshold },
-        ],
-      });
-
-      try {
-        this.isPlacingSale = true;
-        if (await this.sell()) {
-          await this.sleep();
-        }
-        this.isPlacingSale = false;
-      } catch (error) {
-        console.error("Error while attempting to sell:", error);
-      }
+    if (!shouldSell) {
       return;
     }
+
+    const scale = 1000000000;
+    const logVolume = trade.token_amount / scale;
+    const logDynamicVolumeThreshold = dynamicVolumeThreshold / scale;
+
+    console.log({
+      triggeredMetrics: {
+        volumeMetric,
+        priceChangeMetric,
+        momentumMetric,
+      },
+      thresholds: [
+        { volume: logVolume, threshold: logDynamicVolumeThreshold },
+        { priceChange, threshold: dynamicPriceChangeThreshold },
+        { shortTermTrend, threshold: longTermTrendThreshold },
+      ],
+    });
+
+    return this.doSell();
   }
 
   private sleep(): Promise<void> {

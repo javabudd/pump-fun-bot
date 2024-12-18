@@ -8,7 +8,6 @@ export default class CoinMonitor {
   private readonly pumpFunSocketIoUrl = "https://frontend-api.pump.fun";
 
   private monitoredCoins: Record<string, Coin> = {};
-  private trippedMonitoredCoins: Record<string, Trade> = {};
 
   public constructor(
     private readonly pumpFun: PumpFun,
@@ -50,29 +49,42 @@ export default class CoinMonitor {
 
       socket.emit("joinTradeRoom", { mint: coin.mint });
 
+      const started = await trader.startSniper();
+
+      if (!started) {
+        socket.disconnect();
+      }
+
+      setTimeout(async () => {
+        try {
+          await trader?.doSell();
+        } catch (error) {
+          console.error("Error while attempting to sell after timeout:", error);
+        }
+        socket.disconnect();
+      }, 45000);
+
       socket.on(`tradeCreated:${coin.mint}`, async (data) => {
         if (!trader) {
           return;
         }
 
         const trade: Trade = data;
-        await this.handleTrade(trader, trade);
+        const tradeResult = await trader.addTrade(trade);
 
-        if (!trader || trader.shouldTerminate) {
+        if (!trader || tradeResult !== undefined) {
           socket.disconnect();
         }
       });
-
-      const started = await trader.startSniper();
-
-      if (!started) {
-        socket.disconnect();
-      }
     });
 
     socket.on("disconnect", async () => {
       if (trader) {
-        await trader.closeAccount();
+        trader.closeAccount().then((accountId) => {
+          if (accountId) {
+            console.log(`Closed account for ${accountId}`);
+          }
+        });
       }
 
       delete this.monitoredCoins[coin.mint];
@@ -84,15 +96,5 @@ export default class CoinMonitor {
       delete this.monitoredCoins[coin.mint];
       trader = null;
     });
-  }
-
-  private async handleTrade(trader: CoinTrader, trade: Trade): Promise<void> {
-    await trader.addTrade(trade);
-
-    if (trade.is_buy) {
-      this.trippedMonitoredCoins[trade.mint] = trade;
-    } else if (this.trippedMonitoredCoins[trade.mint]) {
-      delete this.trippedMonitoredCoins[trade.mint];
-    }
   }
 }
