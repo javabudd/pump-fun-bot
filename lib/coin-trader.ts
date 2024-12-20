@@ -28,8 +28,8 @@ export default class CoinTrader {
   private buyTimestamp?: number; // Track when we bought for time-based logic
 
   // Simple configuration parameters for a more pump-event-oriented strategy
-  private readonly stopLossPercent = 0.9; // 10% drop triggers stop-loss
-  private readonly takeProfitPercent = 1.3; // 30% gain triggers take-profit
+  private readonly stopLossPercent = 0.95; // 5% drop triggers stop-loss
+  private readonly takeProfitPercent = 1.5; // 50% gain triggers take-profit
   private readonly computeUnits = 200_000; // default is 140,000
   private readonly priorityFee = 300000; // 0.003 SOL as priority fee
   private readonly positionAmount = 750 * 1_000_000_000; // 750k tokens
@@ -51,10 +51,6 @@ export default class CoinTrader {
       this.coin.twitter &&
       this.coin.telegram
     ) {
-      console.log(
-        `Initiating sniper for ${this.coin.name} (${this.coin.mint})...`,
-      );
-
       return this.buy();
     } else {
       return false;
