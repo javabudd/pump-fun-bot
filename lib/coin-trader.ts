@@ -33,7 +33,7 @@ export default class CoinTrader {
   private readonly computeUnits = 200_000; // default is 140,000
   private readonly priorityFee = 300000; // 0.003 SOL as priority fee
   private readonly positionAmount = 750 * 1_000_000_000; // 750k tokens
-  private readonly startingMarketCapMin = 10000;
+  private readonly startingMarketCapMin = 7000;
   private readonly pumpFunAuthority =
     "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
 
@@ -48,8 +48,7 @@ export default class CoinTrader {
   public async startSniper(): Promise<boolean> {
     if (
       this.coin.usd_market_cap >= this.startingMarketCapMin &&
-      this.coin.twitter &&
-      this.coin.telegram
+      (this.coin.twitter || this.coin.telegram)
     ) {
       return this.buy();
     } else {
