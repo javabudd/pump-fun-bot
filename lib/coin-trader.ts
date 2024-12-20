@@ -25,12 +25,12 @@ export default class CoinTrader {
   private hasPosition = false;
   private associatedUserAddress: PublicKey | null = null;
   private buyPrice: number | null = null;
+  private buyTimestamp?: number; // Track when we bought for time-based logic
 
-  private readonly sleepAfterSell = 2000;
   private readonly computeUnits = 200_000; // default is 140,000
-  private readonly priorityFee = 300000; // 0.001 SOL as priority fee
-  private readonly positionAmount = 500 * 1_000_000_000; // 500k tokens
-  private readonly startingMarketCap = 7000;
+  private readonly priorityFee = 300000; // 0.003 SOL as priority fee
+  private readonly positionAmount = 750 * 1_000_000_000; // 750k tokens
+  private readonly startingMarketCap = 30000;
   private readonly pumpFunAuthority =
     "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
 
@@ -101,9 +101,7 @@ export default class CoinTrader {
   public async doSell() {
     try {
       this.isPlacingSale = true;
-      if (await this.sell()) {
-        await this.sleep();
-      }
+      await this.sell();
       this.isPlacingSale = false;
     } catch (error) {
       console.error("Error while attempting to sell:", error);
@@ -215,6 +213,7 @@ export default class CoinTrader {
       this.hasPosition = true;
       this.buyPrice =
         this.coin.virtual_sol_reserves / this.coin.virtual_token_reserves;
+      this.buyTimestamp = Date.now(); // Record the time we entered the position
 
       return true;
     } catch (error) {
@@ -242,11 +241,9 @@ export default class CoinTrader {
       return false;
     }
 
-    // Calculate minSolOutput using BN arithmetic
     const slippageMultiplier = new BN(10000 - slippageTolerance * 10000).div(
       new BN(10000),
     );
-
     const minSolOutput = expectedSolOutput.mul(slippageMultiplier);
 
     console.log(
@@ -298,111 +295,63 @@ export default class CoinTrader {
   }
 
   private async attemptSniperSell(trade: Trade): Promise<boolean | undefined> {
-    if (!this.hasPosition || this.isPlacingSale) {
+    if (!this.hasPosition || this.isPlacingSale || !this.buyTimestamp) {
       return;
     }
 
-    let priceChange = 0,
-      dynamicVolumeThreshold = 0,
-      dynamicPriceChangeThreshold = 0,
-      shortTermTrend = 0,
-      longTermTrendThreshold = 0;
-
-    let shouldSell: boolean,
-      volumeMetric = false,
-      priceChangeMetric = false,
-      momentumMetric = false,
-      stopLossMetric = false;
+    // Simple configuration parameters for a more pump-event-oriented strategy
+    const STOP_LOSS_PERCENT = 0.9; // 10% drop triggers stop-loss
+    const TAKE_PROFIT_PERCENT = 1.3; // 30% gain triggers take-profit
 
     const currentPrice =
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
 
-    // Stop-loss threshold: 10% drop
-    const stopLossThreshold = this.buyPrice! * 0.9;
+    const stopLossThreshold = this.buyPrice! * STOP_LOSS_PERCENT;
+    const takeProfitThreshold = this.buyPrice! * TAKE_PROFIT_PERCENT;
+
+    // Check external signals (stub methods to be implemented)
+    const isPumpEnding = this.checkPumpEndingSignal();
+    const whalesSelling = this.detectWhaleSellOff(trade);
+
+    let shouldSell = false;
+
     if (currentPrice < stopLossThreshold) {
       shouldSell = true;
-      stopLossMetric = shouldSell;
-    } else {
-      // Step 1: Calculate Dynamic Volume Threshold (Retained)
-      const recentTrades = this.trades.slice(-50);
-      const avgVolume =
-        recentTrades.reduce((sum, t) => sum + t.token_amount, 0) /
-        (recentTrades.length || 1);
-      const marketCapVolatilityFactor =
-        trade.usd_market_cap < 50_000
-          ? 5
-          : trade.usd_market_cap < 100_000
-            ? 2.5
-            : 1;
-
-      dynamicVolumeThreshold = avgVolume * marketCapVolatilityFactor;
-
-      volumeMetric = trade.token_amount > dynamicVolumeThreshold;
-
-      // Step 2: Enhanced Price Change Detection
-      const volatility = this.calculateVolatility(
-        recentTrades.map((t) => t.sol_amount),
+      console.log(
+        `Stop-loss triggered. Current: ${currentPrice}, Threshold: ${stopLossThreshold}`,
       );
-
-      dynamicPriceChangeThreshold = 0.01 + volatility * 0.02; // Base + volatility adjustment
-
-      const solPriceBefore =
-        trade.virtual_sol_reserves / trade.virtual_token_reserves;
-      const solPriceAfter =
-        (trade.virtual_sol_reserves + trade.sol_amount) /
-        (trade.virtual_token_reserves + trade.token_amount);
-
-      priceChange = Math.abs((solPriceAfter - solPriceBefore) / solPriceBefore);
-
-      priceChangeMetric = priceChange > dynamicPriceChangeThreshold;
-
-      // Step 3: Assess Momentum
-      shortTermTrend = this.calculateEMA(
-        this.trades.slice(-10).map((t) => t.sol_amount),
-        5,
+    } else if (currentPrice > takeProfitThreshold) {
+      shouldSell = true;
+      console.log(
+        `Take-profit triggered. Current: ${currentPrice}, Threshold: ${takeProfitThreshold}`,
       );
-
-      const longTermTrend = this.calculateEMA(
-        this.trades.map((t) => t.sol_amount),
-        20,
+    } else if (isPumpEnding || whalesSelling) {
+      shouldSell = true;
+      console.log(
+        "Pump-ending or whale-selling signal detected, exiting position.",
       );
-
-      longTermTrendThreshold = longTermTrend * 2; // Significant upward trend
-
-      momentumMetric = shortTermTrend > longTermTrendThreshold;
-
-      // Step 4: Combine Metrics
-      shouldSell = volumeMetric || priceChangeMetric || momentumMetric;
     }
 
     if (!shouldSell) {
       return;
     }
 
-    const scale = 1000000000;
-    const logVolume = trade.token_amount / scale;
-    const logDynamicVolumeThreshold = dynamicVolumeThreshold / scale;
-
-    console.log({
-      triggeredMetrics: {
-        volumeMetric,
-        priceChangeMetric,
-        momentumMetric,
-        stopLossMetric,
-      },
-      thresholds: [
-        { volume: logVolume, threshold: logDynamicVolumeThreshold },
-        { priceChange, threshold: dynamicPriceChangeThreshold },
-        { shortTermTrend, threshold: longTermTrendThreshold },
-      ],
-    });
-
     return this.doSell();
   }
 
-  private sleep(): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, this.sleepAfterSell));
+  // Placeholder for pump-ending signal detection
+  // Implement your logic here (e.g., check external APIs, timer-based logic, etc.)
+  private checkPumpEndingSignal(): boolean {
+    // For now, always return false. Implement as needed.
+    return false;
+  }
+
+  // Placeholder for whale sell-off detection
+  // Implement your logic here, e.g., track known wallets and see if they are selling
+  private detectWhaleSellOff(trade: Trade): boolean {
+    // For now, always return false. Implement as needed.
+    return false;
   }
 
   private async getExpectedSolOutput(amount: number): Promise<BN> {
@@ -440,44 +389,5 @@ export default class CoinTrader {
     const feeBasisPoints = new BN(data.slice(16, 20), "le"); // u32
 
     return { virtualTokenReserves, virtualSolReserves, feeBasisPoints };
-  }
-
-  private calculateEMA(data: number[], period: number): number {
-    const k = 2 / (period + 1);
-    return data.reduce(
-      (prev, curr, idx) => (idx === 0 ? curr : curr * k + prev * (1 - k)),
-      0,
-    );
-  }
-
-  private isSustainedPriceChange(): boolean {
-    const lookback = 20; // Last 20 trades
-    const recentPrices = this.trades.slice(-lookback).map((t) => t.sol_amount);
-
-    const recoveryThreshold = 0.95; // 95% recovery
-    const initialDrop = Math.min(...recentPrices) / recentPrices[0];
-    const recovery =
-      recentPrices[recentPrices.length - 1] / Math.min(...recentPrices);
-
-    return initialDrop < recoveryThreshold && recovery > recoveryThreshold;
-  }
-
-  private calculateVolatility(data: number[]): number {
-    if (data.length === 0) {
-      return 0; // No volatility for empty data
-    }
-
-    // Step 1: Calculate the mean
-    const mean = data.reduce((sum, value) => sum + value, 0) / data.length;
-
-    // Step 2: Calculate the squared differences from the mean
-    const squaredDiffs = data.map((value) => Math.pow(value - mean, 2));
-
-    // Step 3: Calculate the variance (mean of squared differences)
-    const variance =
-      squaredDiffs.reduce((sum, value) => sum + value, 0) / data.length;
-
-    // Step 4: Return the standard deviation (square root of variance)
-    return Math.sqrt(variance);
   }
 }
