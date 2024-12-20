@@ -38,6 +38,8 @@ export default class CoinTrader {
   private readonly pumpFunAuthority =
     "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
 
+  private readonly blacklistedNameStrings = ["test"];
+
   public constructor(
     private readonly pumpFun: PumpFun,
     private readonly coin: Coin,
@@ -50,6 +52,7 @@ export default class CoinTrader {
     if (
       this.coin.description.length <= 10 &&
       !this.coin.hidden &&
+      !this.isNameBlacklisted(this.coin.name) &&
       (this.coin.twitter || this.coin.telegram)
     ) {
       return this.buy();
@@ -413,5 +416,11 @@ export default class CoinTrader {
     const feeBasisPoints = new BN(data.slice(16, 20), "le"); // u32
 
     return { virtualTokenReserves, virtualSolReserves, feeBasisPoints };
+  }
+
+  private isNameBlacklisted(name: string): boolean {
+    return this.blacklistedNameStrings.some((blacklist) =>
+      name.toLowerCase().includes(blacklist.toLowerCase()),
+    );
   }
 }
