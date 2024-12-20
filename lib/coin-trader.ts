@@ -25,15 +25,16 @@ export default class CoinTrader {
   private hasPosition = false;
   private associatedUserAddress: PublicKey | null = null;
   private buyPrice: number | null = null;
-  private buyTimestamp?: number; // Track when we bought for time-based logic
+  private buyTimestamp?: number; // Track when we bought
+  private highestPriceSinceBuy: number | null = null;
+  private trailingStopMode = false; // Once take profit threshold is hit, we activate trailing stop mode
 
-  // Simple configuration parameters for a more pump-event-oriented strategy
-  private readonly stopLossPercent = 0.95; // 5% drop triggers stop-loss
-  private readonly takeProfitPercent = 1.5; // 50% gain triggers take-profit
-  private readonly computeUnits = 200_000; // default is 140,000
-  private readonly priorityFee = 300000; // 0.003 SOL as priority fee
-  private readonly positionAmount = 750 * 1_000_000_000; // 750k tokens
-  private readonly startingMarketCapMin = 7000;
+  private readonly stopLossRatio = 0.95; // If price < 95% of buy price, sell (5% drop)
+  private readonly takeProfitRatio = 1.5; // If price > 150% of buy price, take profit (50% gain)
+  private readonly trailingStopPercent = 0.1; // 10% drop from the peak triggers trailing stop sell
+  private readonly computeUnits = 200_000;
+  private readonly priorityFee = 300000;
+  private readonly positionAmount = 750 * 1_000_000_000;
   private readonly pumpFunAuthority =
     "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
 
@@ -47,7 +48,8 @@ export default class CoinTrader {
 
   public async startSniper(): Promise<boolean> {
     if (
-      this.coin.usd_market_cap >= this.startingMarketCapMin &&
+      this.coin.description.length <= 10 &&
+      !this.coin.hidden &&
       (this.coin.twitter || this.coin.telegram)
     ) {
       return this.buy();
@@ -79,7 +81,6 @@ export default class CoinTrader {
       console.error(
         `Failed to close associated token account: ${this.associatedUserAddress?.toBase58()}`,
       );
-
       return;
     }
 
@@ -99,24 +100,31 @@ export default class CoinTrader {
   public async doSell() {
     try {
       this.isPlacingSale = true;
-      await this.sell();
+      const sold = await this.sell();
+      if (sold) {
+        console.log("Position closed successfully.");
+      } else {
+        console.log("Sell attempt failed.");
+      }
       this.isPlacingSale = false;
+      this.hasPosition = false;
+      this.highestPriceSinceBuy = null;
+      this.trailingStopMode = false;
+      this.buyTimestamp = undefined;
+      this.buyPrice = null;
+
+      return sold;
     } catch (error) {
       console.error("Error while attempting to sell:", error);
-
       return false;
     }
-
-    return true;
   }
 
   private async buy(): Promise<boolean> {
     const url = `https://pump.fun/coin/${this.coin.mint}`;
-
     console.log(`Executing buy for ${this.coin.name} at ${url}...`);
 
     const mint = new PublicKey(this.coin.mint);
-
     this.associatedUserAddress = getAssociatedTokenAddressSync(
       mint,
       this.pumpFun.keypair.publicKey,
@@ -153,7 +161,6 @@ export default class CoinTrader {
     }).compileToV0Message();
 
     const versionedTransaction = new VersionedTransaction(message);
-
     versionedTransaction.sign([this.pumpFun.keypair]);
 
     try {
@@ -211,12 +218,12 @@ export default class CoinTrader {
       this.hasPosition = true;
       this.buyPrice =
         this.coin.virtual_sol_reserves / this.coin.virtual_token_reserves;
-      this.buyTimestamp = Date.now(); // Record the time we entered the position
+      this.buyTimestamp = Date.now();
+      this.highestPriceSinceBuy = this.buyPrice; // Track starting highest price
 
       return true;
     } catch (error) {
       console.error("Buy transaction failed: ", error);
-
       return false;
     }
   }
@@ -283,17 +290,20 @@ export default class CoinTrader {
         });
 
       console.log(`Sell transaction successful: ${transaction}`);
-    } catch {
-      console.error("Sell transaction failed!");
-
+      return true;
+    } catch (err) {
+      console.error("Sell transaction failed!", err);
       return false;
     }
-
-    return true;
   }
 
   private async attemptSniperSell(trade: Trade): Promise<boolean | undefined> {
-    if (!this.hasPosition || this.isPlacingSale || !this.buyTimestamp) {
+    if (
+      !this.hasPosition ||
+      this.isPlacingSale ||
+      !this.buyTimestamp ||
+      !this.buyPrice
+    ) {
       return;
     }
 
@@ -301,26 +311,49 @@ export default class CoinTrader {
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
 
-    const stopLossThreshold = this.buyPrice! * this.stopLossPercent;
-    const takeProfitThreshold = this.buyPrice! * this.takeProfitPercent;
+    // Update highest price seen since buy
+    if (this.highestPriceSinceBuy && currentPrice > this.highestPriceSinceBuy) {
+      this.highestPriceSinceBuy = currentPrice;
+    }
 
-    // Check external signals (stub methods to be implemented)
+    const stopLossThreshold = this.buyPrice * this.stopLossRatio;
+    const takeProfitThreshold = this.buyPrice * this.takeProfitRatio;
+
+    // Check pump ending or whale selling signals
     const isPumpEnding = this.checkPumpEndingSignal();
     const whalesSelling = this.detectWhaleSellOff(trade);
 
     let shouldSell = false;
 
     if (currentPrice < stopLossThreshold) {
+      // Stop-Loss
       shouldSell = true;
       console.log(
         `Stop-loss triggered. Current: ${currentPrice}, Threshold: ${stopLossThreshold}`,
       );
-    } else if (currentPrice > takeProfitThreshold) {
-      shouldSell = true;
+    } else if (!this.trailingStopMode && currentPrice >= takeProfitThreshold) {
+      // Hit initial take profit threshold
+      // Instead of selling immediately, let's enter trailing stop mode
+      this.trailingStopMode = true;
+      this.highestPriceSinceBuy = currentPrice; // Reset the highest price in trailing mode
       console.log(
-        `Take-profit triggered. Current: ${currentPrice}, Threshold: ${takeProfitThreshold}`,
+        `Take-profit threshold reached. Entering trailing stop mode at price: ${currentPrice}`,
       );
-    } else if (isPumpEnding || whalesSelling) {
+    } else if (this.trailingStopMode && this.highestPriceSinceBuy) {
+      // In trailing stop mode, if price falls by a certain percent from the highest peak, sell
+      const trailingStopTrigger =
+        this.highestPriceSinceBuy * (1 - this.trailingStopPercent);
+      if (currentPrice < trailingStopTrigger) {
+        shouldSell = true;
+        console.log(
+          `Trailing stop triggered. Current: ${currentPrice}, Trigger: ${trailingStopTrigger}, Peak: ${this.highestPriceSinceBuy}`,
+        );
+      }
+    }
+
+    // Even if not triggered by stop-loss or trailing stop,
+    // if external signals (pump ending or whales selling) appear, consider selling.
+    if (!shouldSell && (isPumpEnding || whalesSelling)) {
       shouldSell = true;
       console.log(
         "Pump-ending or whale-selling signal detected, exiting position.",
@@ -334,13 +367,11 @@ export default class CoinTrader {
     return this.doSell();
   }
 
-  // Implement logic here (e.g., check external APIs, timer-based logic, etc.)
   private checkPumpEndingSignal(): boolean {
-    // For now, always return false. Implement as needed.
+    // Return true if external conditions indicate the pump is ending
     return false;
   }
 
-  // Implement logic here, e.g., track known wallets and see if they are selling
   private detectWhaleSellOff(trade: Trade): boolean {
     if (trade.user === "some known whale" && !trade.is_buy) {
       return true;
@@ -351,7 +382,6 @@ export default class CoinTrader {
 
   private async getExpectedSolOutput(amount: number): Promise<BN> {
     const bondingCurveAddress = new PublicKey(this.coin.bonding_curve);
-
     const bondingCurveInfo =
       await this.pumpFun.connection.getAccountInfo(bondingCurveAddress);
 
@@ -365,7 +395,6 @@ export default class CoinTrader {
       bondingCurveData;
 
     const amountBN = new BN(amount);
-
     const feeMultiplier = new BN(10000).sub(feeBasisPoints).div(new BN(10000));
 
     return amountBN
