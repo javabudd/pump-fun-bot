@@ -27,10 +27,13 @@ export default class CoinTrader {
   private buyPrice: number | null = null;
   private buyTimestamp?: number; // Track when we bought for time-based logic
 
+  // Simple configuration parameters for a more pump-event-oriented strategy
+  private readonly stopLossPercent = 0.9; // 10% drop triggers stop-loss
+  private readonly takeProfitPercent = 1.3; // 30% gain triggers take-profit
   private readonly computeUnits = 200_000; // default is 140,000
   private readonly priorityFee = 300000; // 0.003 SOL as priority fee
   private readonly positionAmount = 750 * 1_000_000_000; // 750k tokens
-  private readonly startingMarketCap = 30000;
+  private readonly startingMarketCapMin = 10000;
   private readonly pumpFunAuthority =
     "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
 
@@ -44,7 +47,7 @@ export default class CoinTrader {
 
   public async startSniper(): Promise<boolean> {
     if (
-      this.coin.usd_market_cap <= this.startingMarketCap &&
+      this.coin.usd_market_cap >= this.startingMarketCapMin &&
       this.coin.twitter &&
       this.coin.telegram
     ) {
@@ -299,16 +302,12 @@ export default class CoinTrader {
       return;
     }
 
-    // Simple configuration parameters for a more pump-event-oriented strategy
-    const STOP_LOSS_PERCENT = 0.9; // 10% drop triggers stop-loss
-    const TAKE_PROFIT_PERCENT = 1.3; // 30% gain triggers take-profit
-
     const currentPrice =
       (trade.virtual_sol_reserves + trade.sol_amount) /
       (trade.virtual_token_reserves + trade.token_amount);
 
-    const stopLossThreshold = this.buyPrice! * STOP_LOSS_PERCENT;
-    const takeProfitThreshold = this.buyPrice! * TAKE_PROFIT_PERCENT;
+    const stopLossThreshold = this.buyPrice! * this.stopLossPercent;
+    const takeProfitThreshold = this.buyPrice! * this.takeProfitPercent;
 
     // Check external signals (stub methods to be implemented)
     const isPumpEnding = this.checkPumpEndingSignal();
@@ -340,17 +339,18 @@ export default class CoinTrader {
     return this.doSell();
   }
 
-  // Placeholder for pump-ending signal detection
-  // Implement your logic here (e.g., check external APIs, timer-based logic, etc.)
+  // Implement logic here (e.g., check external APIs, timer-based logic, etc.)
   private checkPumpEndingSignal(): boolean {
     // For now, always return false. Implement as needed.
     return false;
   }
 
-  // Placeholder for whale sell-off detection
-  // Implement your logic here, e.g., track known wallets and see if they are selling
+  // Implement logic here, e.g., track known wallets and see if they are selling
   private detectWhaleSellOff(trade: Trade): boolean {
-    // For now, always return false. Implement as needed.
+    if (trade.user === "some known whale" && !trade.is_buy) {
+      return true;
+    }
+
     return false;
   }
 
