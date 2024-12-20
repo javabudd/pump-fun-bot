@@ -6,7 +6,7 @@
     "go": "npm run build && npm run run"
   },
   "engines": {
-    "node": ">=22 <23"
+    "node": ">=23 <24"
   },
   "dependencies": {
     "@project-serum/anchor": "^0.26.0",

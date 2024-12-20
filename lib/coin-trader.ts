@@ -28,7 +28,7 @@ export default class CoinTrader {
 
   private readonly sleepAfterSell = 2000;
   private readonly computeUnits = 200_000; // default is 140,000
-  private readonly priorityFee = 900000; // 0.0009 SOL as priority fee
+  private readonly priorityFee = 300000; // 0.001 SOL as priority fee
   private readonly positionAmount = 500 * 1_000_000_000; // 500k tokens
   private readonly startingMarketCap = 7000;
   private readonly pumpFunAuthority =
