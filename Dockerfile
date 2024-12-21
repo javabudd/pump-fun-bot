@@ -6,6 +6,12 @@ RUN apt update && \
 
 RUN npm install -g @solana/spl-token
 
-COPY scripts/close.sh /
+COPY .env /
+COPY scripts/ /
+COPY entrypoint.sh /
 
-ENTRYPOINT ["/bin/bash"]
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+CMD ["/bin/bash"]

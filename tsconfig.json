@@ -12,7 +12,8 @@
     ]
   },
   "include": [
-    "bot.ts"
+    "bot.ts",
+    "clean.ts"
   ],
   "exclude": [
     "node_modules"
