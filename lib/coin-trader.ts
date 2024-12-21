@@ -30,10 +30,10 @@ export default class CoinTrader {
   private trailingStopMode = false; // Once take profit threshold is hit, we activate trailing stop mode
 
   private readonly stopLossRatio = 0.95; // If price < 95% of buy price, sell (5% drop)
-  private readonly takeProfitRatio = 1.5; // If price > 150% of buy price, take profit (50% gain)
+  private readonly takeProfitRatio = 1.25; // If price > 125% of buy price, take profit (25% gain)
   private readonly trailingStopPercent = 0.1; // 10% drop from the peak triggers trailing stop sell
   private readonly computeUnits = 200_000;
-  private readonly priorityFee = 300000;
+  private readonly priorityFee = 100000;
   private readonly positionAmount = 750 * 1_000_000_000;
   private readonly pumpFunAuthority =
     "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
