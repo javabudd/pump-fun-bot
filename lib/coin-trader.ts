@@ -34,7 +34,7 @@ export default class CoinTrader {
   private readonly trailingStopPercent = 0.1; // 10% drop from the peak triggers trailing stop sell
   private readonly computeUnits = 200_000;
   private readonly priorityFee = 150000;
-  private readonly positionAmount = 750 * 1_000_000_000;
+  private readonly positionAmount = 500 * 1_000_000_000;
   private readonly pumpFunAuthority =
     "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
 
@@ -316,7 +316,9 @@ export default class CoinTrader {
       return;
     }
 
-    const currentPrice = this.calculateCurrentPrice();
+    const currentPrice =
+      (trade.sol_amount + trade.virtual_sol_reserves) /
+      (trade.token_amount + trade.virtual_token_reserves);
 
     if (!currentPrice) {
       console.warn("No current price available, skipping stop-loss check.");
@@ -336,6 +338,8 @@ export default class CoinTrader {
     const whalesSelling = this.detectWhaleSellOff(trade);
 
     let shouldSell = false;
+
+    console.log(`current: ${currentPrice}, stop: ${stopLossThreshold}`);
 
     if (currentPrice < stopLossThreshold) {
       // Stop-Loss
@@ -430,19 +434,6 @@ export default class CoinTrader {
   private isNameBlacklisted(name: string): boolean {
     return this.blacklistedNameStrings.some((blacklist) =>
       name.toLowerCase().includes(blacklist.toLowerCase()),
-    );
-  }
-
-  private calculateCurrentPrice(): number | null {
-    if (this.trades.length === 0) {
-      return null; // No trades available
-    }
-
-    const lastTrade = this.trades[this.trades.length - 1];
-
-    return (
-      (lastTrade.sol_amount + lastTrade.virtual_sol_reserves) /
-      (lastTrade.token_amount + lastTrade.virtual_token_reserves)
     );
   }
 }
