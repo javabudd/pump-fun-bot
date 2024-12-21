@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Function to close a token account
 close_account() {
