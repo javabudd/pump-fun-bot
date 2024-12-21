@@ -97,6 +97,12 @@ export default class CoinTrader {
 
     this.trades.push(trade);
 
+    if (trade.raydium_pool !== null) {
+      console.log(`Raydium reached for ${this.coin.name}!`);
+
+      return;
+    }
+
     return this.attemptSniperSell(trade);
   }
 
