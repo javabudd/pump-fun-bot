@@ -310,9 +310,12 @@ export default class CoinTrader {
       return;
     }
 
-    const currentPrice =
-      (trade.virtual_sol_reserves + trade.sol_amount) /
-      (trade.virtual_token_reserves + trade.token_amount);
+    const currentPrice = this.calculateCurrentPrice();
+
+    if (!currentPrice) {
+      console.warn("No current price available, skipping stop-loss check.");
+      return;
+    }
 
     // Update highest price seen since buy
     if (this.highestPriceSinceBuy && currentPrice > this.highestPriceSinceBuy) {
@@ -421,6 +424,19 @@ export default class CoinTrader {
   private isNameBlacklisted(name: string): boolean {
     return this.blacklistedNameStrings.some((blacklist) =>
       name.toLowerCase().includes(blacklist.toLowerCase()),
+    );
+  }
+
+  private calculateCurrentPrice(): number | null {
+    if (this.trades.length === 0) {
+      return null; // No trades available
+    }
+
+    const lastTrade = this.trades[this.trades.length - 1];
+
+    return (
+      (lastTrade.sol_amount + lastTrade.virtual_sol_reserves) /
+      (lastTrade.token_amount + lastTrade.virtual_token_reserves)
     );
   }
 }
