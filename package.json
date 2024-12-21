@@ -3,7 +3,7 @@
   "scripts": {
     "build": "npx tsc",
     "bot": "node dist/bot.js",
-    "clean": "node dist/clean.js",
+    "close": "node dist/close.js",
     "go": "npm run build && npm run run"
   },
   "engines": {
