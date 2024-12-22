@@ -230,15 +230,10 @@ export default class CoinTrader {
 
       console.log(`Buy transaction successful: ${transaction}`);
 
-      let updatedReserves;
-      try {
-        updatedReserves = await this.getTokenReserves();
-      } catch (error) {
-        console.error(error);
-      }
+      const updatedReserves = await this.getTokenReserves();
 
       if (!updatedReserves) {
-        console.error(`Failed to fetch account info for: ${this.coin.name}`);
+        console.error(`Failed to fetch account info, using default buy price`);
 
         this.buyPrice =
           this.coin.virtual_sol_reserves / this.coin.virtual_token_reserves;
