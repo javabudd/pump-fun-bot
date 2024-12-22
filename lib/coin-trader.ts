@@ -343,7 +343,7 @@ export default class CoinTrader {
     }
 
     const stopLossThreshold = Math.abs(this.buyPrice * this.stopLossRatio);
-    const takeProfitThreshold = this.buyPrice * this.takeProfitRatio;
+    const takeProfitThreshold = Math.abs(this.buyPrice * this.takeProfitRatio);
 
     const isPumpEnding = this.checkPumpEndingSignal();
     const whalesSelling = this.detectWhaleSellOff(trade);
