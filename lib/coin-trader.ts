@@ -235,7 +235,7 @@ export default class CoinTrader {
       if (!updatedReserves) {
         console.error(`Failed to fetch account info, using default buy price`);
 
-        this.buyPrice = this.buyPrice =
+        this.buyPrice =
           this.coin.virtual_sol_reserves /
           (this.coin.virtual_token_reserves / Math.pow(10, this.decimals));
       } else {
@@ -454,7 +454,7 @@ export default class CoinTrader {
   }
 
   private async getTokenReserves(): Promise<TokenReserves | undefined> {
-    const poolAddress = new PublicKey(this.coin.mint);
+    const poolAddress = new PublicKey(this.coin.bonding_curve);
 
     try {
       const accountInfo =
