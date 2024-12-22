@@ -235,11 +235,13 @@ export default class CoinTrader {
       if (!updatedReserves) {
         console.error(`Failed to fetch account info, using default buy price`);
 
-        this.buyPrice =
-          this.coin.virtual_sol_reserves / this.coin.virtual_token_reserves;
+        this.buyPrice = this.buyPrice =
+          this.coin.virtual_sol_reserves /
+          (this.coin.virtual_token_reserves / Math.pow(10, this.decimals));
       } else {
         this.buyPrice =
-          updatedReserves.solReserves / updatedReserves.tokenReserves;
+          updatedReserves.solReserves /
+          (updatedReserves.tokenReserves / Math.pow(10, this.decimals));
       }
 
       this.hasPosition = true;
@@ -354,9 +356,7 @@ export default class CoinTrader {
 
     let shouldSell = false;
 
-    console.log(
-      `current: ${currentPrice / 100000}, stop: ${stopLossThreshold / 100000}`,
-    );
+    console.log(`current: ${currentPrice}, stop: ${stopLossThreshold}`);
 
     if (currentPrice < stopLossThreshold) {
       shouldSell = true;
