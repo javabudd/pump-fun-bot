@@ -230,19 +230,17 @@ export default class CoinTrader {
 
       console.log(`Buy transaction successful: ${transaction}`);
 
-      const updatedReserves = await this.getTokenReserves();
+      const estimatedSolReserves =
+        this.coin.virtual_sol_reserves + Math.abs(this.positionAmount);
+      const tokenOutflow =
+        this.positionAmount *
+        (this.coin.virtual_token_reserves / this.coin.virtual_sol_reserves);
+      const estimatedTokenReserves =
+        this.coin.virtual_token_reserves - Math.abs(tokenOutflow);
 
-      if (!updatedReserves) {
-        console.error(`Failed to fetch account info, using default buy price`);
-
-        this.buyPrice =
-          this.coin.virtual_sol_reserves /
-          (this.coin.virtual_token_reserves / Math.pow(10, this.decimals));
-      } else {
-        this.buyPrice =
-          updatedReserves.solReserves /
-          (updatedReserves.tokenReserves / Math.pow(10, this.decimals));
-      }
+      this.buyPrice =
+        estimatedSolReserves /
+        (estimatedTokenReserves / Math.pow(10, this.decimals));
 
       this.hasPosition = true;
       this.buyTimestamp = Date.now();
@@ -349,7 +347,7 @@ export default class CoinTrader {
       this.highestPriceSinceBuy = currentPrice;
     }
 
-    const stopLossThreshold = this.buyPrice * this.stopLossRatio;
+    const stopLossThreshold = Math.abs(this.buyPrice * this.stopLossRatio);
     const takeProfitThreshold = this.buyPrice * this.takeProfitRatio;
 
     const isPumpEnding = this.checkPumpEndingSignal();
@@ -452,39 +450,5 @@ export default class CoinTrader {
     return this.blacklistedNameStrings.some((blacklist) =>
       name.toLowerCase().includes(blacklist.toLowerCase()),
     );
-  }
-
-  private async getTokenReserves(): Promise<TokenReserves | undefined> {
-    const poolAddress = new PublicKey(this.coin.bonding_curve);
-
-    try {
-      const accountInfo =
-        await this.pumpFun.connection.getAccountInfo(poolAddress);
-
-      if (!accountInfo || !accountInfo.data) {
-        console.error(
-          `Failed to fetch account info for pool: ${poolAddress.toBase58()}`,
-        );
-        return undefined;
-      }
-
-      const reserves = this.parseBondingCurve(accountInfo.data);
-
-      const solReserves = reserves.virtualSolReserves.div(
-        new BN(10).pow(new BN(this.decimals)),
-      );
-
-      const tokenReserves = reserves.virtualTokenReserves.div(
-        new BN(10).pow(new BN(this.decimals)),
-      );
-
-      return {
-        solReserves: solReserves.toNumber(),
-        tokenReserves: tokenReserves.toNumber(),
-      };
-    } catch (error) {
-      console.error("Error fetching token reserves:", error);
-      return undefined;
-    }
   }
 }
