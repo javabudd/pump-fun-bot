@@ -19,6 +19,11 @@ import {
 import { PumpFun } from "../types/pump-fun";
 import { Buffer } from "buffer";
 
+interface TokenReserves {
+  solReserves: number;
+  tokenReserves: number;
+}
+
 export default class CoinTrader {
   private trades: Array<Trade> = [];
   private isPlacingSale = false;
@@ -29,9 +34,9 @@ export default class CoinTrader {
   private highestPriceSinceBuy: number | null = null;
   private trailingStopMode = false; // Once take profit threshold is hit, we activate trailing stop mode
 
-  private readonly stopLossRatio = 0.95; // If price < 95% of buy price, sell (5% drop)
-  private readonly takeProfitRatio = 1.25; // If price > 125% of buy price, take profit (25% gain)
-  private readonly trailingStopPercent = 0.1; // 10% drop from the peak triggers trailing stop sell
+  private readonly stopLossRatio = 0.97; // If price < 97% of buy price, sell (3% drop)
+  private readonly takeProfitRatio = 1.27; // If price > 125% of buy price, take profit (27% gain)
+  private readonly trailingStopPercent = 0.07; // 7% drop from the peak triggers trailing stop sell
   private readonly computeUnits = 200_000;
   private readonly priorityFee = 150000;
   private readonly positionAmount = 500 * 1_000_000_000;
@@ -39,6 +44,7 @@ export default class CoinTrader {
     "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
 
   private readonly blacklistedNameStrings = ["test"];
+  private readonly decimals = 9;
 
   public constructor(
     private readonly pumpFun: PumpFun,
@@ -224,11 +230,26 @@ export default class CoinTrader {
 
       console.log(`Buy transaction successful: ${transaction}`);
 
+      let updatedReserves;
+      try {
+        updatedReserves = await this.getTokenReserves();
+      } catch (error) {
+        console.error(error);
+      }
+
+      if (!updatedReserves) {
+        console.error(`Failed to fetch account info for: ${this.coin.name}`);
+
+        this.buyPrice =
+          this.coin.virtual_sol_reserves / this.coin.virtual_token_reserves;
+      } else {
+        this.buyPrice =
+          updatedReserves.solReserves / updatedReserves.tokenReserves;
+      }
+
       this.hasPosition = true;
-      this.buyPrice =
-        this.coin.virtual_sol_reserves / this.coin.virtual_token_reserves;
       this.buyTimestamp = Date.now();
-      this.highestPriceSinceBuy = this.buyPrice; // Track starting highest price
+      this.highestPriceSinceBuy = this.buyPrice;
 
       return true;
     } catch (error) {
@@ -318,14 +339,14 @@ export default class CoinTrader {
 
     const currentPrice =
       (trade.sol_amount + trade.virtual_sol_reserves) /
-      (trade.token_amount + trade.virtual_token_reserves);
+      ((trade.token_amount + trade.virtual_token_reserves) /
+        Math.pow(10, this.decimals));
 
     if (!currentPrice) {
       console.warn("No current price available, skipping stop-loss check.");
       return;
     }
 
-    // Update highest price seen since buy
     if (this.highestPriceSinceBuy && currentPrice > this.highestPriceSinceBuy) {
       this.highestPriceSinceBuy = currentPrice;
     }
@@ -333,16 +354,16 @@ export default class CoinTrader {
     const stopLossThreshold = this.buyPrice * this.stopLossRatio;
     const takeProfitThreshold = this.buyPrice * this.takeProfitRatio;
 
-    // Check pump ending or whale selling signals
     const isPumpEnding = this.checkPumpEndingSignal();
     const whalesSelling = this.detectWhaleSellOff(trade);
 
     let shouldSell = false;
 
-    console.log(`current: ${currentPrice}, stop: ${stopLossThreshold}`);
+    console.log(
+      `current: ${currentPrice / 100000}, stop: ${stopLossThreshold / 100000}`,
+    );
 
     if (currentPrice < stopLossThreshold) {
-      // Stop-Loss
       shouldSell = true;
       console.log(
         `Stop-loss triggered. Current: ${currentPrice}, Threshold: ${stopLossThreshold}`,
@@ -435,5 +456,39 @@ export default class CoinTrader {
     return this.blacklistedNameStrings.some((blacklist) =>
       name.toLowerCase().includes(blacklist.toLowerCase()),
     );
+  }
+
+  private async getTokenReserves(): Promise<TokenReserves | undefined> {
+    const poolAddress = new PublicKey(this.coin.mint);
+
+    try {
+      const accountInfo =
+        await this.pumpFun.connection.getAccountInfo(poolAddress);
+
+      if (!accountInfo || !accountInfo.data) {
+        console.error(
+          `Failed to fetch account info for pool: ${poolAddress.toBase58()}`,
+        );
+        return undefined;
+      }
+
+      const reserves = this.parseBondingCurve(accountInfo.data);
+
+      const solReserves = reserves.virtualSolReserves.div(
+        new BN(10).pow(new BN(this.decimals)),
+      );
+
+      const tokenReserves = reserves.virtualTokenReserves.div(
+        new BN(10).pow(new BN(this.decimals)),
+      );
+
+      return {
+        solReserves: solReserves.toNumber(),
+        tokenReserves: tokenReserves.toNumber(),
+      };
+    } catch (error) {
+      console.error("Error fetching token reserves:", error);
+      return undefined;
+    }
   }
 }
