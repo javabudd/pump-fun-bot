@@ -329,7 +329,8 @@ export default class CoinTrader {
       !this.hasPosition ||
       this.isPlacingSale ||
       !this.buyTimestamp ||
-      !this.buyPrice
+      !this.buyPrice ||
+      trade.user === this.pumpFun.keypair.publicKey.toBase58()
     ) {
       return;
     }
