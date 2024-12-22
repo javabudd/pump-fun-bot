@@ -34,7 +34,7 @@ export default class CoinTrader {
   private highestPriceSinceBuy: number | null = null;
   private trailingStopMode = false; // Once take profit threshold is hit, we activate trailing stop mode
 
-  private readonly stopLossRatio = 0.97; // If price < 97% of buy price, sell (3% drop)
+  private readonly stopLossRatio = 0.9; // If price < 90% of buy price, sell (10% drop)
   private readonly takeProfitRatio = 1.27; // If price > 125% of buy price, take profit (27% gain)
   private readonly trailingStopPercent = 0.07; // 7% drop from the peak triggers trailing stop sell
   private readonly computeUnits = 200_000;
