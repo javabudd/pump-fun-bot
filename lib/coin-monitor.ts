@@ -5,7 +5,7 @@ import { Trade } from "../types/trade";
 import { PumpFun } from "../types/pump-fun";
 
 export default class CoinMonitor {
-  private readonly pumpFunSocketIoUrl = "https://frontend-api.pump.fun";
+  private readonly pumpFunSocketIoUrl = "https://frontend-api-v3.pump.fun";
 
   private monitoredCoins: Record<string, Coin> = {};
 
