@@ -2,7 +2,7 @@
 
 ## Requirements
 
-* node==23
+* node==23 (`nvm use`)
 * npm
 
 ## Building
