@@ -339,8 +339,6 @@ export default class CoinTrader {
       return;
     }
 
-    console.log(`Current price ${currentPrice}`);
-
     if (this.highestPriceSinceBuy && currentPrice > this.highestPriceSinceBuy) {
       this.highestPriceSinceBuy = currentPrice;
     }
