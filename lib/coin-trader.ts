@@ -138,6 +138,8 @@ export default class CoinTrader {
     console.log(`Executing buy for ${this.coin.name} at ${url}...`);
 
     if (this.asMock) {
+      this.setBuyProperties();
+
       return true;
     }
 
@@ -232,21 +234,7 @@ export default class CoinTrader {
 
       console.log(`Buy transaction successful: ${transaction}`);
 
-      const estimatedSolReserves =
-        this.coin.virtual_sol_reserves + Math.abs(this.positionAmount);
-      const tokenOutflow =
-        this.positionAmount *
-        (this.coin.virtual_token_reserves / this.coin.virtual_sol_reserves);
-      const estimatedTokenReserves =
-        this.coin.virtual_token_reserves - Math.abs(tokenOutflow);
-
-      this.buyPrice =
-        estimatedSolReserves /
-        (estimatedTokenReserves / Math.pow(10, this.decimals));
-
-      this.hasPosition = true;
-      this.buyTimestamp = Date.now();
-      this.highestPriceSinceBuy = this.buyPrice;
+      this.setBuyProperties();
 
       return true;
     } catch (error) {
@@ -350,6 +338,8 @@ export default class CoinTrader {
       console.warn("No current price available, skipping stop-loss check.");
       return;
     }
+
+    console.log(`Current price ${currentPrice}`);
 
     if (this.highestPriceSinceBuy && currentPrice > this.highestPriceSinceBuy) {
       this.highestPriceSinceBuy = currentPrice;
@@ -458,5 +448,23 @@ export default class CoinTrader {
     return this.blacklistedNameStrings.some((blacklist) =>
       name.toLowerCase().includes(blacklist.toLowerCase()),
     );
+  }
+
+  private setBuyProperties(): void {
+    const estimatedSolReserves =
+      this.coin.virtual_sol_reserves + Math.abs(this.positionAmount);
+    const tokenOutflow =
+      this.positionAmount *
+      (this.coin.virtual_token_reserves / this.coin.virtual_sol_reserves);
+    const estimatedTokenReserves =
+      this.coin.virtual_token_reserves - Math.abs(tokenOutflow);
+
+    this.buyPrice =
+      estimatedSolReserves /
+      (estimatedTokenReserves / Math.pow(10, this.decimals));
+
+    this.hasPosition = true;
+    this.buyTimestamp = Date.now();
+    this.highestPriceSinceBuy = this.buyPrice;
   }
 }
