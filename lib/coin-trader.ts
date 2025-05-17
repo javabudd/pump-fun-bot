@@ -19,6 +19,8 @@ import {
 import { PumpFun } from "../types/pump-fun";
 import { Buffer } from "buffer";
 
+process.loadEnvFile(".env");
+
 export default class CoinTrader {
   private trades: Array<Trade> = [];
   private isPlacingSale = false;
@@ -28,6 +30,7 @@ export default class CoinTrader {
   private buyTimestamp?: number; // Track when we bought
   private highestPriceSinceBuy: number | null = null;
   private trailingStopMode = false; // Once take profit threshold is hit, we activate trailing stop mode
+  private asMock: boolean = process.env["AS_MOCK"] === "true";
 
   private readonly stopLossRatio = 0.93; // If price < 93% of buy price, sell (7% drop)
   private readonly takeProfitRatio = 1.2; // If price > 120% of buy price, take profit (20% gain)
@@ -130,12 +133,12 @@ export default class CoinTrader {
     }
   }
 
-  private async buy(asMock: boolean = false): Promise<boolean> {
+  private async buy(): Promise<boolean> {
     const url = `https://pump.fun/coin/${this.coin.mint}`;
     console.log(`Executing buy for ${this.coin.name} at ${url}...`);
 
-    if (asMock) {
-      return false;
+    if (this.asMock) {
+      return true;
     }
 
     const mint = new PublicKey(this.coin.mint);
@@ -253,6 +256,12 @@ export default class CoinTrader {
   }
 
   private async sell(slippageTolerance: number = 0.1): Promise<boolean> {
+    if (this.asMock) {
+      console.log("Executing mock sell...");
+
+      return true;
+    }
+
     const mint = new PublicKey(this.coin.mint);
 
     if (!this.associatedUserAddress) {
