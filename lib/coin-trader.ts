@@ -130,9 +130,13 @@ export default class CoinTrader {
     }
   }
 
-  private async buy(): Promise<boolean> {
+  private async buy(asMock: boolean = false): Promise<boolean> {
     const url = `https://pump.fun/coin/${this.coin.mint}`;
     console.log(`Executing buy for ${this.coin.name} at ${url}...`);
+
+    if (asMock) {
+      return false;
+    }
 
     const mint = new PublicKey(this.coin.mint);
     this.associatedUserAddress = getAssociatedTokenAddressSync(
