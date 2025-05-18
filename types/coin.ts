@@ -12,7 +12,7 @@ export type Coin = {
   associated_bonding_curve: string;
   creator: string;
   created_timestamp: number;
-  raydium_pool: string;
+  raydium_pool: string | null;
   complete: boolean;
   virtual_sol_reserves: number;
   virtual_token_reserves: number;
@@ -27,7 +27,20 @@ export type Coin = {
   nsfw: boolean;
   market_id: string | null;
   inverted: boolean | null;
-
-  // local
+  real_sol_reserves: number;
+  real_token_reserves: number;
+  livestream_ban_expiry: number;
+  last_reply: null | string;
+  reply_count: number;
+  is_banned: boolean;
+  is_currently_live: boolean;
+  initialized: boolean;
+  video_uri: string | null;
+  updated_at: string | null;
+  pump_swap_pool: string | null;
+  ath_market_cap: number | null;
+  ath_market_cap_timestamp: number | null;
+  banner_uri: string | null;
+  hide_banner: boolean;
   monitorStart: string;
 };

@@ -53,10 +53,11 @@ export default class CoinTrader {
 
   public async startSniper(): Promise<boolean> {
     if (
-      this.coin.description.length <= 10 &&
+      !this.coin.is_banned &&
       !this.coin.hidden &&
       !this.isNameBlacklisted(this.coin.name) &&
-      (this.coin.twitter || this.coin.telegram)
+      (this.coin.twitter || this.coin.telegram) &&
+      this.coin.is_currently_live
     ) {
       return this.buy();
     } else {
