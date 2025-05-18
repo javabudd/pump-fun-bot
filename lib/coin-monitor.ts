@@ -74,17 +74,29 @@ export default class CoinMonitor {
         socket.disconnect();
       }, 60000);
 
+      let run = true;
+      while (run) {
+        setTimeout(async () => {
+          if (!trader) {
+            return;
+          }
+
+          const tradeResult = trader.attemptSniperSell();
+
+          if (!trader || tradeResult !== undefined) {
+            socket.disconnect();
+            run = false;
+          }
+        }, 1000);
+      }
+
       socket.on(`tradeCreated:${coin.mint}`, async (data) => {
         if (!trader) {
           return;
         }
 
         const trade: Trade = data;
-        const tradeResult = await trader.addTrade(trade);
-
-        if (!trader || tradeResult !== undefined) {
-          socket.disconnect();
-        }
+        trader.addTrade(trade);
       });
     });
 

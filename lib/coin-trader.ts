@@ -14,7 +14,6 @@ export default class CoinTrader {
   private trades: Array<Trade> = [];
   private isPlacingSale = false;
   private hasPosition = false;
-  private associatedUserAddress: PublicKey | null = null;
   private buyPrice: number | null = null;
   private buyTimestamp?: number; // Track when we bought
   private highestPriceSinceBuy: number | null = null;
@@ -53,21 +52,16 @@ export default class CoinTrader {
     }
   }
 
-  public async closeAccount(): Promise<string | undefined> {
-    if (!this.associatedUserAddress) {
-      return;
-    }
-
+  public async closeAccount(): Promise<string> {
     const account = await this.pumpFun.getBondingCurveAccount(
       new PublicKey(this.coin.mint),
     );
 
-    logger.info(`Bonding account to close: ${account}`);
-
     // @TODO close account
+    return this.coin.bonding_curve.toString();
   }
 
-  public async addTrade(trade: Trade): Promise<boolean | undefined> {
+  public addTrade(trade: Trade): void {
     if (trade.mint !== this.coin.mint) {
       return;
     }
@@ -79,11 +73,84 @@ export default class CoinTrader {
 
     if (trade.raydium_pool !== null) {
       logger.info(`Raydium reached for ${this.coin.name}!`);
+    }
+  }
 
+  public async attemptSniperSell(): Promise<boolean | undefined> {
+    if (
+      !this.hasPosition ||
+      this.isPlacingSale ||
+      !this.buyTimestamp ||
+      !this.buyPrice
+    ) {
       return;
     }
 
-    return this.attemptSniperSell(trade);
+    const trade = this.trades[-1];
+
+    const currentPrice =
+      (trade.sol_amount + trade.virtual_sol_reserves) /
+      ((trade.token_amount + trade.virtual_token_reserves) /
+        Math.pow(10, DEFAULT_DECIMALS));
+
+    if (!currentPrice) {
+      logger.warn("No current price available, skipping stop-loss check.");
+      return;
+    }
+
+    if (this.highestPriceSinceBuy && currentPrice > this.highestPriceSinceBuy) {
+      this.highestPriceSinceBuy = currentPrice;
+    }
+
+    const stopLossThreshold = Math.abs(this.buyPrice * this.stopLossRatio);
+    const takeProfitThreshold = Math.abs(this.buyPrice * this.takeProfitRatio);
+
+    const isPumpEnding = this.checkPumpEndingSignal();
+    const whalesSelling = this.detectWhaleSellOff(trade);
+
+    let shouldSell = false;
+
+    logger.info(`current: ${currentPrice}, stop: ${stopLossThreshold}`);
+
+    if (currentPrice < stopLossThreshold) {
+      shouldSell = true;
+      logger.info(
+        `Stop-loss triggered. Current: ${currentPrice}, Threshold: ${stopLossThreshold}`,
+      );
+    } else if (!this.trailingStopMode && currentPrice >= takeProfitThreshold) {
+      // Hit initial take profit threshold
+      // Instead of selling immediately, let's enter trailing stop mode
+      this.trailingStopMode = true;
+      this.highestPriceSinceBuy = currentPrice; // Reset the highest price in trailing mode
+      logger.info(
+        `Take-profit threshold reached. Entering trailing stop mode at price: ${currentPrice}`,
+      );
+    } else if (this.trailingStopMode && this.highestPriceSinceBuy) {
+      // In trailing stop mode, if price falls by a certain percent from the highest peak, sell
+      const trailingStopTrigger =
+        this.highestPriceSinceBuy * (1 - this.trailingStopPercent);
+      if (currentPrice < trailingStopTrigger) {
+        shouldSell = true;
+        logger.info(
+          `Trailing stop triggered. Current: ${currentPrice}, Trigger: ${trailingStopTrigger}, Peak: ${this.highestPriceSinceBuy}`,
+        );
+      }
+    }
+
+    // Even if not triggered by stop-loss or trailing stop,
+    // if external signals (pump ending or whales selling) appear, consider selling.
+    if (!shouldSell && (isPumpEnding || whalesSelling)) {
+      shouldSell = true;
+      logger.info(
+        "Pump-ending or whale-selling signal detected, exiting position.",
+      );
+    }
+
+    if (!shouldSell) {
+      return;
+    }
+
+    return this.doSell();
   }
 
   public async doSell() {
@@ -211,82 +278,6 @@ export default class CoinTrader {
 
       return false;
     }
-  }
-
-  private async attemptSniperSell(trade: Trade): Promise<boolean | undefined> {
-    if (
-      !this.hasPosition ||
-      this.isPlacingSale ||
-      !this.buyTimestamp ||
-      !this.buyPrice ||
-      trade.user === this.pumpFun.program.provider.publicKey?.toBase58()
-    ) {
-      return;
-    }
-
-    const currentPrice =
-      (trade.sol_amount + trade.virtual_sol_reserves) /
-      ((trade.token_amount + trade.virtual_token_reserves) /
-        Math.pow(10, DEFAULT_DECIMALS));
-
-    if (!currentPrice) {
-      logger.warn("No current price available, skipping stop-loss check.");
-      return;
-    }
-
-    if (this.highestPriceSinceBuy && currentPrice > this.highestPriceSinceBuy) {
-      this.highestPriceSinceBuy = currentPrice;
-    }
-
-    const stopLossThreshold = Math.abs(this.buyPrice * this.stopLossRatio);
-    const takeProfitThreshold = Math.abs(this.buyPrice * this.takeProfitRatio);
-
-    const isPumpEnding = this.checkPumpEndingSignal();
-    const whalesSelling = this.detectWhaleSellOff(trade);
-
-    let shouldSell = false;
-
-    logger.info(`current: ${currentPrice}, stop: ${stopLossThreshold}`);
-
-    if (currentPrice < stopLossThreshold) {
-      shouldSell = true;
-      logger.info(
-        `Stop-loss triggered. Current: ${currentPrice}, Threshold: ${stopLossThreshold}`,
-      );
-    } else if (!this.trailingStopMode && currentPrice >= takeProfitThreshold) {
-      // Hit initial take profit threshold
-      // Instead of selling immediately, let's enter trailing stop mode
-      this.trailingStopMode = true;
-      this.highestPriceSinceBuy = currentPrice; // Reset the highest price in trailing mode
-      logger.info(
-        `Take-profit threshold reached. Entering trailing stop mode at price: ${currentPrice}`,
-      );
-    } else if (this.trailingStopMode && this.highestPriceSinceBuy) {
-      // In trailing stop mode, if price falls by a certain percent from the highest peak, sell
-      const trailingStopTrigger =
-        this.highestPriceSinceBuy * (1 - this.trailingStopPercent);
-      if (currentPrice < trailingStopTrigger) {
-        shouldSell = true;
-        logger.info(
-          `Trailing stop triggered. Current: ${currentPrice}, Trigger: ${trailingStopTrigger}, Peak: ${this.highestPriceSinceBuy}`,
-        );
-      }
-    }
-
-    // Even if not triggered by stop-loss or trailing stop,
-    // if external signals (pump ending or whales selling) appear, consider selling.
-    if (!shouldSell && (isPumpEnding || whalesSelling)) {
-      shouldSell = true;
-      logger.info(
-        "Pump-ending or whale-selling signal detected, exiting position.",
-      );
-    }
-
-    if (!shouldSell) {
-      return;
-    }
-
-    return this.doSell();
   }
 
   private checkPumpEndingSignal(): boolean {
