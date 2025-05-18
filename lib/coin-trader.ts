@@ -73,6 +73,9 @@ export default class CoinTrader {
       return;
     }
 
+    this.coin.virtual_sol_reserves = trade.virtual_sol_reserves;
+    this.coin.virtual_token_reserves = trade.virtual_token_reserves;
+
     this.trades.push(trade);
 
     if (trade.raydium_pool !== null) {
