@@ -205,7 +205,7 @@ export default class CoinTrader {
 
     const mintPublicKey = new PublicKey(this.coin.mint);
 
-    await this.waitForBondingCurve(mintPublicKey);
+    const bondingCurve = await this.waitForBondingCurve(mintPublicKey);
 
     let buyResults;
     try {
@@ -215,8 +215,11 @@ export default class CoinTrader {
         BigInt(this.positionAmount * LAMPORTS_PER_SOL),
         this.slippageBasisPoints,
         {
-          unitLimit: this.estimateUnitLimitForBuy(this.positionAmount),
-          unitPrice: this.estimateUnitPrice(),
+          unitLimit: this.estimateUnitLimitForBuy(
+            bondingCurve,
+            this.positionAmount,
+          ),
+          unitPrice: this.estimateUnitPrice(bondingCurve),
         },
         "processed",
         "confirmed",
@@ -251,7 +254,7 @@ export default class CoinTrader {
 
     const mintPublicKey = new PublicKey(this.coin.mint);
 
-    await this.waitForBondingCurve(mintPublicKey);
+    const bondingCurve = await this.waitForBondingCurve(mintPublicKey);
 
     const currentSPLBalance = await this.getSPLBalance(mintPublicKey);
     if (currentSPLBalance === null) {
@@ -265,11 +268,11 @@ export default class CoinTrader {
     const sellResults = await this.pumpFun.sell(
       this.buyerSellerKeypair,
       mintPublicKey,
-      BigInt(currentSPLBalance * Math.pow(10, DEFAULT_DECIMALS)),
+      BigInt(currentSPLBalance),
       this.slippageBasisPoints,
       {
         unitLimit: this.estimateUnitLimitForSell(currentSPLBalance),
-        unitPrice: this.estimateUnitPrice(),
+        unitPrice: this.estimateUnitPrice(bondingCurve),
       },
       "finalized",
       "confirmed",
@@ -371,21 +374,16 @@ export default class CoinTrader {
         ata,
         "processed",
       );
-      return balance.value.uiAmount;
+      return parseInt(balance.value.amount);
     } catch (e) {
       logger.error(`Failed retrieving balance ${e}`);
     }
     return null;
   }
 
-  private estimateUnitPrice(): number {
-    let virtualSolReserves = this.coin.virtual_sol_reserves;
-    let virtualTokenReserves = this.coin.virtual_token_reserves;
-    const lastTrade = this.getLastTrade();
-    if (lastTrade) {
-      virtualSolReserves = lastTrade.virtual_sol_reserves;
-      virtualTokenReserves = lastTrade.virtual_token_reserves;
-    }
+  private estimateUnitPrice(bondingCurve: BondingCurveAccount): number {
+    const virtualSolReserves = Number(bondingCurve.virtualSolReserves);
+    const virtualTokenReserves = Number(bondingCurve.virtualTokenReserves);
 
     // 1) Marginal price in lamports per token:
     //    reserves are lamports and raw token units
@@ -400,14 +398,12 @@ export default class CoinTrader {
     return Math.min(this.MAX_UINT32, Math.ceil(bufferedPrice));
   }
 
-  private estimateUnitLimitForBuy(solAmount: number): number {
-    let virtualSolReserves = this.coin.virtual_sol_reserves;
-    let virtualTokenReserves = this.coin.virtual_token_reserves;
-    const lastTrade = this.getLastTrade();
-    if (lastTrade) {
-      virtualSolReserves = lastTrade.virtual_sol_reserves;
-      virtualTokenReserves = lastTrade.virtual_token_reserves;
-    }
+  private estimateUnitLimitForBuy(
+    bondingCurve: BondingCurveAccount,
+    solAmount: number,
+  ): number {
+    const virtualSolReserves = Number(bondingCurve.virtualSolReserves);
+    const virtualTokenReserves = Number(bondingCurve.virtualTokenReserves);
 
     // 1) How many lamports we’re spending
     const lamportsToSpend = solAmount * LAMPORTS_PER_SOL;
@@ -438,7 +434,9 @@ export default class CoinTrader {
   private estimateUnitLimitForSell(uiAmount: number): number {
     let units = Math.floor(uiAmount * Math.pow(10, DEFAULT_DECIMALS)); // scale to raw units
 
-    units = Math.floor(units * 0.99); // 1% buffer down to avoid rounding issues
+    if (units > 10) {
+      units = Math.floor(units * 0.99);
+    }
 
     units = Math.min(units, this.MAX_UINT32);
 
