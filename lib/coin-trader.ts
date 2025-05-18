@@ -367,20 +367,24 @@ export default class CoinTrader {
   }
 
   private estimateUnitPrice(): number {
-    const { virtual_token_reserves, virtual_sol_reserves } = this.coin;
+    let virtualSolReserves = this.coin.virtual_sol_reserves;
+    let virtualTokenReserves = this.coin.virtual_token_reserves;
+    if (this.trades.length > 0) {
+      virtualSolReserves = this.trades[-1].virtual_sol_reserves;
+      virtualTokenReserves = this.trades[-1].virtual_token_reserves;
+    }
+
     // 1) Marginal price in lamports per token:
     //    reserves are lamports and raw token units
     const pricePerToken =
-      virtual_sol_reserves /
-      (virtual_token_reserves / Math.pow(10, DEFAULT_DECIMALS));
+      virtualSolReserves /
+      (virtualTokenReserves / Math.pow(10, DEFAULT_DECIMALS));
 
     // 2) Apply buffer for slippage (e.g. +5%)
     const bufferedPrice = pricePerToken * 1.05;
 
     // 3) Round up to an integer, clamp to u32 max
-    const unitPrice = Math.min(this.MAX_UINT32, Math.ceil(bufferedPrice));
-
-    return unitPrice;
+    return Math.min(this.MAX_UINT32, Math.ceil(bufferedPrice));
   }
 
   private estimateUnitLimitForBuy(solAmount: number): number {
