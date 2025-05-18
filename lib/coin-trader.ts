@@ -86,8 +86,6 @@ export default class CoinTrader {
     const trade = this.getLastTrade();
 
     if (!trade) {
-      logger.warn("No trade data available yet, skipping sell attempt.");
-
       return;
     }
 
@@ -213,7 +211,7 @@ export default class CoinTrader {
           unitLimit: this.estimateUnitLimitForBuy(this.positionAmount),
           unitPrice: this.estimateUnitPrice(),
         },
-        "confirmed",
+        "processed",
         "confirmed",
       );
     } catch (error) {

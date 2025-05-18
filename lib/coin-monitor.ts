@@ -52,6 +52,16 @@ export default class CoinMonitor {
       transports: ["websocket"],
     });
 
+    socket.on(`tradeCreated:${coin.mint}`, async (data) => {
+      if (!trader) {
+        return;
+      }
+
+      const trade: Trade = data;
+
+      trader.addTrade(trade);
+    });
+
     socket.on("connect", async () => {
       if (!trader) {
         return;
@@ -79,7 +89,7 @@ export default class CoinMonitor {
       const attemptSellLoop = async () => {
         if (!trader) return;
 
-        const tradeResult = trader.attemptSniperSell();
+        const tradeResult = await trader.attemptSniperSell();
 
         if (tradeResult !== undefined) {
           clearTimeout(sellTimeout);
@@ -91,15 +101,6 @@ export default class CoinMonitor {
       };
 
       attemptSellLoop();
-
-      socket.on(`tradeCreated:${coin.mint}`, async (data) => {
-        if (!trader) {
-          return;
-        }
-
-        const trade: Trade = data;
-        trader.addTrade(trade);
-      });
     });
 
     socket.on("disconnect", async () => {
