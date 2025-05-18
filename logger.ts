@@ -40,6 +40,7 @@ const customTransport = {
 
 export const logger = pino(
   {
+    level: "error",
     customLevels: {
       error: 1,
       info: 2,

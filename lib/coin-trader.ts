@@ -190,7 +190,7 @@ export default class CoinTrader {
         versionedTransaction.serialize(),
         {
           maxRetries: 1,
-          skipPreflight: true,
+          skipPreflight: false,
         },
       );
     } catch {
@@ -199,17 +199,14 @@ export default class CoinTrader {
     }
 
     logger.info(
-      "Associated token account created:",
-      this.associatedUserAddress.toBase58(),
+      `Associated token account created: ${this.associatedUserAddress.toBase58()}`,
     );
 
     try {
-      logger.info("Executing buy transaction...");
-
-      const transaction = await this.pumpFun.anchorProgram.methods
+      const tx = await this.pumpFun.anchorProgram.methods
         .buy(
           new BN(this.positionAmount),
-          new BN(this.positionAmount + this.positionAmount * 0.05), // Max SOL cost with 5% slippage
+          new BN(this.positionAmount + this.positionAmount * 0.05),
         )
         .preInstructions(feeInstructions)
         .accounts({
@@ -229,19 +226,16 @@ export default class CoinTrader {
           program: this.pumpFun.anchorProgram.programId,
         })
         .signers([this.pumpFun.keypair])
-        .rpc({
-          maxRetries: 10,
-          commitment: "processed",
-          skipPreflight: true,
-        });
+        .rpc({ maxRetries: 10, commitment: "processed", skipPreflight: false });
 
-      logger.buy(`Buy transaction successful: ${transaction}`);
+      logger.buy(`Buy transaction successful: ${tx}`);
 
       this.setBuyProperties();
 
       return true;
-    } catch (error) {
-      logger.error("Buy transaction failed: ", error);
+    } catch (e: unknown) {
+      logger.error(`Buy failed: ${e}`);
+
       return false;
     }
   }
