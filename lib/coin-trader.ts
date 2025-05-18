@@ -42,8 +42,7 @@ export default class CoinTrader {
       !this.coin.is_banned &&
       !this.coin.hidden &&
       !this.isNameBlacklisted(this.coin.name) &&
-      (this.coin.twitter || this.coin.telegram) &&
-      this.coin.is_currently_live
+      (this.coin.twitter || this.coin.telegram)
     ) {
       return this.buyTokens();
     } else {
