@@ -66,9 +66,6 @@ export default class CoinTrader {
       return;
     }
 
-    this.coin.virtual_sol_reserves = trade.virtual_sol_reserves;
-    this.coin.virtual_token_reserves = trade.virtual_token_reserves;
-
     this.trades.push(trade);
 
     if (trade.raydium_pool !== null) {
@@ -300,13 +297,19 @@ export default class CoinTrader {
   }
 
   private setBuyProperties(): void {
+    let virtualSolReserves = this.coin.virtual_sol_reserves;
+    let virtualTokenReserves = this.coin.virtual_token_reserves;
+    if (this.trades.length > 0) {
+      virtualSolReserves = this.trades[-1].virtual_sol_reserves;
+      virtualTokenReserves = this.trades[-1].virtual_token_reserves;
+    }
+
     const estimatedSolReserves =
-      this.coin.virtual_sol_reserves + Math.abs(this.positionAmount);
+      virtualSolReserves + Math.abs(this.positionAmount);
     const tokenOutflow =
-      this.positionAmount *
-      (this.coin.virtual_token_reserves / this.coin.virtual_sol_reserves);
+      this.positionAmount * (virtualTokenReserves / virtualSolReserves);
     const estimatedTokenReserves =
-      this.coin.virtual_token_reserves - Math.abs(tokenOutflow);
+      virtualTokenReserves - Math.abs(tokenOutflow);
 
     this.buyPrice =
       estimatedSolReserves /
@@ -386,8 +389,8 @@ export default class CoinTrader {
 
     // 2) Get the same base price per token (without buffer)
     const basePrice =
-      this.coin.virtual_sol_reserves /
-      (this.coin.virtual_token_reserves / Math.pow(10, DEFAULT_DECIMALS));
+      this.trades[-1].virtual_sol_reserves /
+      (this.trades[-1].virtual_token_reserves / Math.pow(10, DEFAULT_DECIMALS));
 
     // 3) Use the *buffered* price so we don’t under-estimate
     const priceWithBuffer = basePrice * 1.05;
