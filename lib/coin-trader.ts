@@ -419,15 +419,23 @@ export default class CoinTrader {
   }
 
   private estimateUnitLimitForSell(uiAmount: number): number {
-    let units = Math.floor(uiAmount * Math.pow(10, DEFAULT_DECIMALS)); // scale to raw units
+    // Convert UI amount (human-readable tokens) into raw token units
+    let units = uiAmount * Math.pow(10, DEFAULT_DECIMALS);
 
-    if (units > 10) {
-      units = Math.floor(units * 0.99);
+    // Apply a safety buffer to account for slippage during the sell
+    const bufferMultiplier = 0.995; // sell slightly less than full balance (0.5% buffer)
+
+    // Round down to avoid exceeding balance
+    units = Math.floor(units * bufferMultiplier);
+
+    // Prevent extremely small sell amounts that could be dust
+    const minUnitsToSell = 10; // adjust as needed
+    if (units < minUnitsToSell) {
+      return 0;
     }
 
-    units = Math.min(units, this.MAX_UINT32);
-
-    return units;
+    // Cap to max uint32 to stay safe for on-chain constraints
+    return Math.min(units, this.MAX_UINT32);
   }
 
   private getLastTrade(): Trade | undefined {
