@@ -2,7 +2,7 @@ import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
 import { Keypair, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-import { PumpFunSDK } from "pumpdotfun-sdk";
+import { BondingCurveAccount, PumpFunSDK } from "pumpdotfun-sdk";
 import { logger } from "../logger";
 
 export default class CoinTrader {
@@ -42,7 +42,8 @@ export default class CoinTrader {
       !this.coin.is_banned &&
       !this.coin.hidden &&
       !this.isNameBlacklisted(this.coin.name) &&
-      (this.coin.twitter || this.coin.telegram || this.coin.is_currently_live)
+      (this.coin.twitter || this.coin.telegram) &&
+      this.coin.is_currently_live
     ) {
       return this.buyTokens();
     } else {
@@ -131,8 +132,8 @@ export default class CoinTrader {
           unitLimit: this.computeUnits,
           unitPrice: this.priorityFee,
         },
-        "processed",
-        "finalized",
+        "confirmed",
+        "confirmed",
       );
     } catch (error) {
       logger.error(`Error while attempting to buy: ${error}`);
@@ -174,6 +175,7 @@ export default class CoinTrader {
           unitLimit: this.computeUnits,
           unitPrice: this.priorityFee,
         },
+        "confirmed",
         "confirmed",
       );
 
@@ -310,9 +312,9 @@ export default class CoinTrader {
 
   private async waitForBondingCurve(
     mint: PublicKey,
-    maxRetries = 15,
+    maxRetries = 7,
     baseDelayMs = 500,
-  ) {
+  ): Promise<BondingCurveAccount> {
     for (let i = 0; i < maxRetries; i++) {
       try {
         const bondingCurve = await this.pumpFun.getBondingCurveAccount(
