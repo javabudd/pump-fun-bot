@@ -20,13 +20,12 @@ export default class CoinTrader {
   private highestPriceSinceBuy: number | null = null;
   private trailingStopMode = false; // Once take profit threshold is hit, we activate trailing stop mode
 
+  private readonly MAX_UINT32 = 4294967295;
   private readonly stopLossRatio = 0.95; // If price < 95% of buy price, sell (5% drop)
   private readonly takeProfitRatio = 1.1; // If price > 110% of buy price, take profit (10% gain)
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
-  private readonly computeUnits = 220_000;
-  private readonly priorityFee = 110_000;
   private readonly positionAmount = 0.02;
-  private readonly slippageBasisPoints = 200n;
+  private readonly slippageBasisPoints = 300n;
 
   private readonly blacklistedNameStrings = ["test"];
   private readonly decimals = 9;
@@ -86,26 +85,32 @@ export default class CoinTrader {
   }
 
   public async doSell() {
-    try {
-      this.isPlacingSale = true;
-      const sold = await this.sellTokens();
-      if (sold) {
-        logger.info("Position closed successfully.");
-      } else {
-        logger.info("Sell attempt failed.");
-      }
-      this.isPlacingSale = false;
-      this.hasPosition = false;
-      this.highestPriceSinceBuy = null;
-      this.trailingStopMode = false;
-      this.buyTimestamp = undefined;
-      this.buyPrice = null;
+    this.isPlacingSale = true;
 
-      return sold;
+    let sold;
+    try {
+      sold = await this.sellTokens();
     } catch (error) {
       logger.error(`Error while attempting to sell: ${error}`);
+
+      this.isPlacingSale = false;
+
       return false;
     }
+
+    if (sold) {
+      logger.info("Position closed successfully.");
+    } else {
+      logger.info("Sell attempt failed.");
+    }
+    this.isPlacingSale = false;
+    this.hasPosition = false;
+    this.highestPriceSinceBuy = null;
+    this.trailingStopMode = false;
+    this.buyTimestamp = undefined;
+    this.buyPrice = null;
+
+    return sold;
   }
 
   private async buyTokens(): Promise<boolean> {
@@ -133,8 +138,8 @@ export default class CoinTrader {
         BigInt(this.positionAmount * LAMPORTS_PER_SOL),
         this.slippageBasisPoints,
         {
-          unitLimit: this.computeUnits,
-          unitPrice: this.priorityFee,
+          unitLimit: this.estimateUnitLimit(this.positionAmount),
+          unitPrice: this.estimateUnitPrice(),
         },
         "confirmed",
         "confirmed",
@@ -184,8 +189,8 @@ export default class CoinTrader {
       BigInt(currentSPLBalance * Math.pow(10, DEFAULT_DECIMALS)),
       this.slippageBasisPoints,
       {
-        unitLimit: this.computeUnits,
-        unitPrice: this.priorityFee,
+        unitLimit: this.estimateUnitLimit(this.positionAmount),
+        unitPrice: this.estimateUnitPrice(),
       },
       "finalized",
       "confirmed",
@@ -202,10 +207,6 @@ export default class CoinTrader {
 
       return false;
     }
-
-    logger.error("No position to sell");
-
-    return false;
   }
 
   private async attemptSniperSell(trade: Trade): Promise<boolean | undefined> {
@@ -365,5 +366,49 @@ export default class CoinTrader {
       logger.error(`Failed retrieving balance ${e}`);
     }
     return null;
+  }
+
+  private estimateUnitPrice(): number {
+    const { virtual_token_reserves, virtual_sol_reserves } = this.coin;
+    // 1) Marginal price in lamports per token:
+    //    reserves are lamports and raw token units
+    const pricePerToken =
+      virtual_sol_reserves /
+      (virtual_token_reserves / Math.pow(10, this.decimals));
+
+    // 2) Apply buffer for slippage (e.g. +5%)
+    const bufferedPrice = pricePerToken * 1.05;
+
+    // 3) Round up to an integer, clamp to u32 max
+    const unitPrice = Math.min(this.MAX_UINT32, Math.ceil(bufferedPrice));
+
+    return unitPrice;
+  }
+
+  private estimateUnitLimit(solAmount: number): number {
+    // 1) How many lamports we’re spending
+    const lamportsToSpend = solAmount * LAMPORTS_PER_SOL;
+
+    // 2) Get the same base price per token (without buffer)
+    const basePrice =
+      this.coin.virtual_sol_reserves /
+      (this.coin.virtual_token_reserves / Math.pow(10, this.decimals));
+
+    // 3) Use the *buffered* price so we don’t under-estimate
+    const priceWithBuffer = basePrice * 1.05;
+
+    // 4) Tokens you expect to receive (as a float, in “whole” tokens)
+    const expectedTokens = lamportsToSpend / priceWithBuffer;
+
+    // 5) Scale to the token’s atomic units (decimals)
+    let units = Math.floor(expectedTokens * Math.pow(10, this.decimals));
+
+    // 6) Add a small extra buffer (e.g. 10%) so rounding/trades don’t fail
+    units = Math.floor(units * 1.1);
+
+    // 7) Clamp to u32 max
+    units = Math.min(units, this.MAX_UINT32);
+
+    return units;
   }
 }
