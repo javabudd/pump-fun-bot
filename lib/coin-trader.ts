@@ -136,7 +136,7 @@ export default class CoinTrader {
   private async buy(): Promise<boolean> {
     const url = `https://pump.fun/coin/${this.coin.mint}`;
     const isMockString = this.asMock ? " mock " : " ";
-    logger.info(
+    logger.attemptBuy(
       `Executing${isMockString}buy for ${this.coin.name} at ${url}...`,
     );
 
@@ -235,7 +235,7 @@ export default class CoinTrader {
           skipPreflight: true,
         });
 
-      logger.info(`Buy transaction successful: ${transaction}`);
+      logger.buy(`Buy transaction successful: ${transaction}`);
 
       this.setBuyProperties();
 
@@ -248,7 +248,7 @@ export default class CoinTrader {
 
   private async sell(slippageTolerance: number = 0.1): Promise<boolean> {
     if (this.asMock) {
-      logger.info("Executing mock sell...");
+      logger.sell("Executing mock sell...");
 
       return true;
     }
