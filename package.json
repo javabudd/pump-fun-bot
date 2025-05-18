@@ -10,9 +10,6 @@
     "node": ">=23 <24"
   },
   "dependencies": {
-    "@project-serum/anchor": "^0.26.0",
-    "@solana/spl-token": "^0.4.13",
-    "@solana/web3.js": "^1.98.2",
     "axios": "^1.9.0",
     "nats.ws": "^1.30.3",
     "pino": "^9.6.0",

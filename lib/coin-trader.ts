@@ -7,8 +7,6 @@ import {
   DEFAULT_DECIMALS,
   PumpFunSDK,
 } from "pumpdotfun-sdk";
-import { BN } from "@project-serum/anchor";
-import { Buffer } from "buffer";
 import { logger } from "../logger";
 
 export default class CoinTrader {
@@ -282,41 +280,6 @@ export default class CoinTrader {
     }
 
     return false;
-  }
-
-  private async getExpectedSolOutput(amount: number): Promise<BN> {
-    const bondingCurveAddress = new PublicKey(this.coin.bonding_curve);
-    const bondingCurveInfo =
-      await this.pumpFun.connection.getAccountInfo(bondingCurveAddress);
-
-    if (!bondingCurveInfo) {
-      throw Error("Could not retrieve bonding curve!");
-    }
-
-    const bondingCurveData = this.parseBondingCurve(bondingCurveInfo.data);
-
-    const { virtualTokenReserves, virtualSolReserves, feeBasisPoints } =
-      bondingCurveData;
-
-    const amountBN = new BN(amount);
-    const feeMultiplier = new BN(10000).sub(feeBasisPoints).div(new BN(10000));
-
-    return amountBN
-      .mul(virtualSolReserves)
-      .div(virtualTokenReserves.add(amountBN))
-      .mul(feeMultiplier);
-  }
-
-  private parseBondingCurve(data: Buffer): {
-    virtualTokenReserves: BN;
-    virtualSolReserves: BN;
-    feeBasisPoints: BN;
-  } {
-    const virtualTokenReserves = new BN(data.slice(0, 8), "le"); // u64
-    const virtualSolReserves = new BN(data.slice(8, 16), "le"); // u64
-    const feeBasisPoints = new BN(data.slice(16, 20), "le"); // u32
-
-    return { virtualTokenReserves, virtualSolReserves, feeBasisPoints };
   }
 
   private isNameBlacklisted(name: string): boolean {
