@@ -44,7 +44,7 @@ export default class CoinTrader {
   public constructor(
     private readonly pumpFun: PumpFun,
     private readonly coin: Coin,
-    private readonly asMock: boolean,
+    private readonly asMock: boolean = false,
   ) {
     this.pumpFun = pumpFun;
     this.coin = coin;
