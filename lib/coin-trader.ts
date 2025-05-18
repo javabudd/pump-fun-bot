@@ -177,6 +177,8 @@ export default class CoinTrader {
           unitLimit: this.computeUnits,
           unitPrice: this.priorityFee,
         },
+        "processed",
+        "confirmed",
       );
 
       if (sellResults.success) {
