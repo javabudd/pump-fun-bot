@@ -25,7 +25,7 @@ export default class CoinTrader {
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
   private readonly positionAmount = 0.02;
   private readonly buySlippageBasisPoints = 600n;
-  private readonly sellSlippageBasisPoints = 1000n;
+  private readonly sellSlippageBasisPoints = 1500n;
   private readonly maxPositionTime = 60; // max seconds to hold position
   private readonly blacklistedNameStrings = ["test"];
 
@@ -45,7 +45,7 @@ export default class CoinTrader {
       !this.coin.is_banned &&
       !this.coin.hidden &&
       !this.isNameBlacklisted(this.coin.name) &&
-      (this.coin.twitter || this.coin.telegram)
+      (!!this.coin.twitter || !!this.coin.telegram || !!this.coin.website)
     ) {
       return this.buyTokens();
     } else {
@@ -403,11 +403,17 @@ export default class CoinTrader {
 
     const lamportsToSpend = solAmount * LAMPORTS_PER_SOL;
 
-    const basePrice =
+    const pricePerToken =
       virtualSolReserves /
       (virtualTokenReserves / Math.pow(10, DEFAULT_DECIMALS));
-    const expectedTokens = lamportsToSpend / basePrice;
-    const units = Math.ceil(expectedTokens * Math.pow(10, DEFAULT_DECIMALS)); // round up for safety
+
+    const expectedTokens = lamportsToSpend / pricePerToken;
+
+    // Apply a small buffer (e.g., 1%) to account for market movement during tx
+    const bufferMultiplier = 1.01;
+    const units = Math.ceil(
+      expectedTokens * bufferMultiplier * Math.pow(10, DEFAULT_DECIMALS),
+    );
 
     return Math.min(units, this.MAX_UINT32);
   }
