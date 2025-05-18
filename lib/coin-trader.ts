@@ -32,9 +32,9 @@ export default class CoinTrader {
   private trailingStopMode = false; // Once take profit threshold is hit, we activate trailing stop mode
   private asMock: boolean = process.env["AS_MOCK"] === "true";
 
-  private readonly stopLossRatio = 0.93; // If price < 93% of buy price, sell (7% drop)
-  private readonly takeProfitRatio = 1.2; // If price > 120% of buy price, take profit (20% gain)
-  private readonly trailingStopPercent = 0.07; // 7% drop from the peak triggers trailing stop sell
+  private readonly stopLossRatio = 0.95; // If price < 95% of buy price, sell (5% drop)
+  private readonly takeProfitRatio = 1.1; // If price > 110% of buy price, take profit (10% gain)
+  private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
   private readonly computeUnits = 200_000;
   private readonly priorityFee = 150000;
   private readonly positionAmount = 500 * 1_000_000_000;
