@@ -20,7 +20,7 @@ export default class CoinTrader {
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
   private readonly computeUnits = 250_000;
   private readonly priorityFee = 150_000;
-  private readonly positionAmount = 0.1;
+  private readonly positionAmount = 0.05;
   private readonly slippageBasisPoints = 100n;
 
   private readonly blacklistedNameStrings = ["test"];
