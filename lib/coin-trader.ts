@@ -248,7 +248,7 @@ export default class CoinTrader {
 
   private async sell(slippageTolerance: number = 0.1): Promise<boolean> {
     if (this.asMock) {
-      logger.sell("Executing mock sell...");
+      logger.attemptSell("Executing mock sell...");
 
       return true;
     }
@@ -275,7 +275,7 @@ export default class CoinTrader {
     );
     const minSolOutput = expectedSolOutput.mul(slippageMultiplier);
 
-    logger.info(
+    logger.attemptSell(
       `Executing sell for "${this.coin.name}" with slippage ${slippageTolerance} and min output ${minSolOutput}...`,
     );
 
@@ -313,7 +313,7 @@ export default class CoinTrader {
           skipPreflight: true,
         });
 
-      logger.info(`Sell transaction successful: ${transaction}`);
+      logger.sell(`Sell transaction successful: ${transaction}`);
       return true;
     } catch (err) {
       logger.error("Sell transaction failed!", err);

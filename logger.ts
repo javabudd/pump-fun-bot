@@ -5,30 +5,32 @@ const customTransport = {
     const parsed = JSON.parse(log);
     const { level, msg } = parsed;
 
-    // ANSI color codes for each level
-    let color = "\x1b[0m"; // default (reset)
+    let color = "\x1b[0m"; // default
 
     switch (level) {
-      case 1: // error
-        color = "\x1b[31m"; // red
-        break;
-      case 2: // info
-        color = "\x1b[34m"; // blue
-        break;
-      case 3: // warn
-        color = "\x1b[33m"; // yellow
-        break;
-      case 7: // attemptBuy
-        color = "\x1b[36m"; // cyan
-        break;
-      case 8: // buy
-        color = "\x1b[32m"; // green
-        break;
-      case 9: // sell
-        color = "\x1b[35m"; // magenta
-        break;
+      case 1:
+        color = "\x1b[31m";
+        break; // error - red
+      case 2:
+        color = "\x1b[34m";
+        break; // info - blue
+      case 3:
+        color = "\x1b[33m";
+        break; // warn - yellow
+      case 7:
+        color = "\x1b[36m";
+        break; // attemptBuy - cyan
+      case 8:
+        color = "\x1b[32m";
+        break; // buy - green
+      case 9:
+        color = "\x1b[35m";
+        break; // sell - magenta
+      case 10:
+        color = "\x1b[93m";
+        break; // attemptSell - bright yellow
       default:
-        color = "\x1b[0m"; // fallback/reset
+        color = "\x1b[0m";
         break;
     }
 
@@ -45,6 +47,7 @@ export const logger = pino(
       attemptBuy: 7,
       buy: 8,
       sell: 9,
+      attemptSell: 10,
     },
     useOnlyCustomLevels: true,
   },
