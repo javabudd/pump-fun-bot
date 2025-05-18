@@ -1,8 +1,8 @@
 import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-import { DEFAULT_DECIMALS, PumpFunSDK } from "pumpdotfun-sdk";
+import { PumpFunSDK } from "pumpdotfun-sdk";
 import { logger } from "../logger";
 
 export default class CoinTrader {
@@ -21,7 +21,7 @@ export default class CoinTrader {
   private readonly computeUnits = 250_000;
   private readonly priorityFee = 150_000;
   private readonly positionAmount = 0.05;
-  private readonly slippageBasisPoints = 100n;
+  private readonly slippageBasisPoints = 300n;
 
   private readonly blacklistedNameStrings = ["test"];
   private readonly decimals = 9;
@@ -42,7 +42,7 @@ export default class CoinTrader {
       !this.coin.is_banned &&
       !this.coin.hidden &&
       !this.isNameBlacklisted(this.coin.name) &&
-      (this.coin.twitter || this.coin.telegram)
+      (this.coin.twitter || this.coin.telegram || this.coin.is_currently_live)
     ) {
       return this.buyTokens();
     } else {
@@ -125,14 +125,13 @@ export default class CoinTrader {
       buyResults = await this.pumpFun.buy(
         this.buyerSellerKeypair,
         mintPublicKey,
-        BigInt(this.positionAmount * Math.pow(10, DEFAULT_DECIMALS)),
+        BigInt(this.positionAmount * LAMPORTS_PER_SOL),
         this.slippageBasisPoints,
         {
           unitLimit: this.computeUnits,
           unitPrice: this.priorityFee,
         },
         "processed",
-        "confirmed",
       );
     } catch (error) {
       logger.error(`Error while attempting to buy: ${error}`);
@@ -168,13 +167,12 @@ export default class CoinTrader {
       const sellResults = await this.pumpFun.sell(
         this.buyerSellerKeypair,
         mintPublicKey,
-        BigInt(this.positionAmount * Math.pow(10, DEFAULT_DECIMALS)),
+        BigInt(this.positionAmount * LAMPORTS_PER_SOL),
         this.slippageBasisPoints,
         {
           unitLimit: this.computeUnits,
           unitPrice: this.priorityFee,
         },
-        "processed",
         "confirmed",
       );
 
