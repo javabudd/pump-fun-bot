@@ -20,7 +20,7 @@ export default class CoinTrader {
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
   private readonly computeUnits = 250_000;
   private readonly priorityFee = 150_000;
-  private readonly positionAmount = 0.05;
+  private readonly positionAmount = 0.025;
   private readonly slippageBasisPoints = 300n;
 
   private readonly blacklistedNameStrings = ["test"];
@@ -131,7 +131,8 @@ export default class CoinTrader {
           unitLimit: this.computeUnits,
           unitPrice: this.priorityFee,
         },
-        "confirmed",
+        "processed",
+        "finalized",
       );
     } catch (error) {
       logger.error(`Error while attempting to buy: ${error}`);
