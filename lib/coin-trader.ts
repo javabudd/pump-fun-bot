@@ -2,11 +2,7 @@ import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
 import { Keypair, PublicKey } from "@solana/web3.js";
 
-import {
-  DEFAULT_COMMITMENT,
-  DEFAULT_DECIMALS,
-  PumpFunSDK,
-} from "pumpdotfun-sdk";
+import { DEFAULT_DECIMALS, PumpFunSDK } from "pumpdotfun-sdk";
 import { logger } from "../logger";
 
 export default class CoinTrader {
@@ -120,8 +116,11 @@ export default class CoinTrader {
       return true;
     }
 
-    let buyResults;
     const mintPublicKey = new PublicKey(this.coin.mint);
+
+    await this.waitForBondingCurve(mintPublicKey);
+
+    let buyResults;
     try {
       buyResults = await this.pumpFun.buy(
         this.buyerSellerKeypair,
@@ -132,6 +131,7 @@ export default class CoinTrader {
           unitLimit: this.computeUnits,
           unitPrice: this.priorityFee,
         },
+        "processed",
         "confirmed",
       );
     } catch (error) {
@@ -152,7 +152,7 @@ export default class CoinTrader {
 
       return true;
     } else {
-      logger.error("Buy failed");
+      logger.error(`Buy failed: ${buyResults.error || "Unknown error"}`);
 
       return false;
     }
@@ -311,5 +311,24 @@ export default class CoinTrader {
     this.hasPosition = true;
     this.buyTimestamp = Date.now();
     this.highestPriceSinceBuy = this.buyPrice;
+  }
+
+  private async waitForBondingCurve(
+    mint: PublicKey,
+    maxRetries = 5,
+    delayMs = 300,
+  ) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const bondingCurve = await this.pumpFun.getBondingCurveAccount(mint);
+        if (bondingCurve) return bondingCurve;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (e) {
+        logger.info("Bonding curve not ready yet...");
+      }
+      await new Promise((res) => setTimeout(res, delayMs));
+    }
+
+    throw new Error("Bonding curve account not found after retries");
   }
 }
