@@ -19,8 +19,6 @@ import {
 import { PumpFun } from "../types/pump-fun";
 import { Buffer } from "buffer";
 
-process.loadEnvFile(".env");
-
 export default class CoinTrader {
   private trades: Array<Trade> = [];
   private isPlacingSale = false;
