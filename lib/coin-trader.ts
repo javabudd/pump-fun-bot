@@ -120,18 +120,25 @@ export default class CoinTrader {
       return true;
     }
 
+    let buyResults;
     const mintPublicKey = new PublicKey(this.coin.mint);
-    const buyResults = await this.pumpFun.buy(
-      this.buyerSellerKeypair,
-      mintPublicKey,
-      BigInt(this.positionAmount * Math.pow(10, DEFAULT_DECIMALS)),
-      this.slippageBasisPoints,
-      {
-        unitLimit: this.computeUnits,
-        unitPrice: this.priorityFee,
-      },
-      DEFAULT_COMMITMENT,
-    );
+    try {
+      buyResults = await this.pumpFun.buy(
+        this.buyerSellerKeypair,
+        mintPublicKey,
+        BigInt(this.positionAmount * Math.pow(10, DEFAULT_DECIMALS)),
+        this.slippageBasisPoints,
+        {
+          unitLimit: this.computeUnits,
+          unitPrice: this.priorityFee,
+        },
+        "confirmed",
+      );
+    } catch (error) {
+      logger.error(`Error while attempting to buy: ${error}`);
+
+      return false;
+    }
 
     if (buyResults.success) {
       logger.buy(
