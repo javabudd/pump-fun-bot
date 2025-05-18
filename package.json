@@ -2,7 +2,7 @@
   "name": "pump.fun.bot",
   "scripts": {
     "build": "npx tsc",
-    "bot": "node dist/bot.js",
+    "bot": "npx ts-node bot.ts",
     "close": "node dist/close.js",
     "go": "npm run build && npm run run"
   },
@@ -27,6 +27,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.4.0",
     "globals": "^15.15.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.32.1"
   }
