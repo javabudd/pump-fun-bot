@@ -28,7 +28,6 @@ export default class CoinTrader {
   private buyTimestamp?: number; // Track when we bought
   private highestPriceSinceBuy: number | null = null;
   private trailingStopMode = false; // Once take profit threshold is hit, we activate trailing stop mode
-  private asMock: boolean = process.env["AS_MOCK"] === "true";
 
   private readonly stopLossRatio = 0.95; // If price < 95% of buy price, sell (5% drop)
   private readonly takeProfitRatio = 1.1; // If price > 110% of buy price, take profit (10% gain)
@@ -45,9 +44,11 @@ export default class CoinTrader {
   public constructor(
     private readonly pumpFun: PumpFun,
     private readonly coin: Coin,
+    private readonly asMock: boolean,
   ) {
     this.pumpFun = pumpFun;
     this.coin = coin;
+    this.asMock = asMock;
   }
 
   public async startSniper(): Promise<boolean> {

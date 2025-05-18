@@ -12,9 +12,11 @@ export default class CoinMonitor {
   public constructor(
     private readonly pumpFun: PumpFun,
     private readonly maximumMonitoredCoins = 1,
+    private readonly asMock = false,
   ) {
     this.pumpFun = pumpFun;
     this.maximumMonitoredCoins = maximumMonitoredCoins;
+    this.asMock = asMock;
   }
 
   public startCoinMonitor(newToken: Coin): void {
@@ -35,7 +37,11 @@ export default class CoinMonitor {
   }
 
   public subscribeToCoinTrades(coin: Coin): void {
-    let trader: CoinTrader | null = new CoinTrader(this.pumpFun, coin);
+    let trader: CoinTrader | null = new CoinTrader(
+      this.pumpFun,
+      coin,
+      this.asMock,
+    );
 
     const socket = io(this.pumpFunSocketIoUrl, {
       path: "/socket.io/",

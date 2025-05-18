@@ -85,7 +85,11 @@ type GlobalAccount = {
     anchorProgram,
   };
 
-  const monitor = new CoinMonitor(pumpFun, 1);
+  const monitor = new CoinMonitor(
+    pumpFun,
+    1,
+    process.env["AS_MOCK"] === "true",
+  );
 
   try {
     const nc: NatsConnection = await connect({
