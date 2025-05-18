@@ -28,7 +28,6 @@ export default class CoinTrader {
   private readonly slippageBasisPoints = 300n;
 
   private readonly blacklistedNameStrings = ["test"];
-  private readonly decimals = 9;
 
   public constructor(
     private readonly pumpFun: PumpFunSDK,
@@ -228,7 +227,7 @@ export default class CoinTrader {
     const currentPrice =
       (trade.sol_amount + trade.virtual_sol_reserves) /
       ((trade.token_amount + trade.virtual_token_reserves) /
-        Math.pow(10, this.decimals));
+        Math.pow(10, DEFAULT_DECIMALS));
 
     if (!currentPrice) {
       logger.warn("No current price available, skipping stop-loss check.");
@@ -320,7 +319,7 @@ export default class CoinTrader {
 
     this.buyPrice =
       estimatedSolReserves /
-      (estimatedTokenReserves / Math.pow(10, this.decimals));
+      (estimatedTokenReserves / Math.pow(10, DEFAULT_DECIMALS));
 
     this.hasPosition = true;
     this.buyTimestamp = Date.now();
@@ -379,7 +378,7 @@ export default class CoinTrader {
     //    reserves are lamports and raw token units
     const pricePerToken =
       virtual_sol_reserves /
-      (virtual_token_reserves / Math.pow(10, this.decimals));
+      (virtual_token_reserves / Math.pow(10, DEFAULT_DECIMALS));
 
     // 2) Apply buffer for slippage (e.g. +5%)
     const bufferedPrice = pricePerToken * 1.05;
@@ -397,7 +396,7 @@ export default class CoinTrader {
     // 2) Get the same base price per token (without buffer)
     const basePrice =
       this.coin.virtual_sol_reserves /
-      (this.coin.virtual_token_reserves / Math.pow(10, this.decimals));
+      (this.coin.virtual_token_reserves / Math.pow(10, DEFAULT_DECIMALS));
 
     // 3) Use the *buffered* price so we don’t under-estimate
     const priceWithBuffer = basePrice * 1.05;
@@ -406,7 +405,7 @@ export default class CoinTrader {
     const expectedTokens = lamportsToSpend / priceWithBuffer;
 
     // 5) Scale to the token’s atomic units (decimals)
-    let units = Math.floor(expectedTokens * Math.pow(10, this.decimals));
+    let units = Math.floor(expectedTokens * Math.pow(10, DEFAULT_DECIMALS));
 
     // 6) Add a small extra buffer (e.g. 10%) so rounding/trades don’t fail
     units = Math.floor(units * 1.1);
@@ -418,7 +417,7 @@ export default class CoinTrader {
   }
 
   private estimateUnitLimitForSell(uiAmount: number): number {
-    let units = Math.floor(uiAmount * Math.pow(10, this.decimals)); // scale to raw units
+    let units = Math.floor(uiAmount * Math.pow(10, DEFAULT_DECIMALS)); // scale to raw units
 
     units = Math.floor(units * 0.99); // 1% buffer down to avoid rounding issues
 
