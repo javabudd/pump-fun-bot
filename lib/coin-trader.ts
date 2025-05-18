@@ -20,7 +20,7 @@ export default class CoinTrader {
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
   private readonly computeUnits = 250_000;
   private readonly priorityFee = 150_000;
-  private readonly positionAmount = 500 * 1_000_000_000;
+  private readonly positionAmount = 0.1;
   private readonly slippageBasisPoints = 100n;
 
   private readonly blacklistedNameStrings = ["test"];
@@ -142,11 +142,8 @@ export default class CoinTrader {
 
     if (buyResults.success) {
       logger.buy(
-        "Bonding curve after buy",
-        await this.pumpFun.getBondingCurveAccount(mintPublicKey),
+        `Buy transaction successful: ${buyResults.results?.transaction.message}`,
       );
-
-      logger.buy(`Buy transaction successful: ${buyResults}`);
 
       this.setBuyProperties();
 
@@ -183,11 +180,8 @@ export default class CoinTrader {
 
       if (sellResults.success) {
         logger.sell(
-          "Bonding curve after sell",
-          await this.pumpFun.getBondingCurveAccount(mintPublicKey),
+          `Sell transaction successful: ${sellResults.results?.transaction.message}`,
         );
-
-        logger.sell(`Sell transaction successful: ${sellResults}`);
 
         return true;
       } else {
