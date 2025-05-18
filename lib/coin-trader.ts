@@ -169,6 +169,8 @@ export default class CoinTrader {
 
     const mintPublicKey = new PublicKey(this.coin.mint);
 
+    await this.waitForBondingCurve(mintPublicKey);
+
     const currentSPLBalance = await this.getSPLBalance(mintPublicKey);
     if (currentSPLBalance === null) {
       return false;
