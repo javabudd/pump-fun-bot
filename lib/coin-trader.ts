@@ -23,8 +23,8 @@ export default class CoinTrader {
   private readonly stopLossRatio = 0.95; // If price < 95% of buy price, sell (5% drop)
   private readonly takeProfitRatio = 1.1; // If price > 110% of buy price, take profit (10% gain)
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
-  private readonly computeUnits = 250_000;
-  private readonly priorityFee = 150_000;
+  private readonly computeUnits = 200_000;
+  private readonly priorityFee = 100_000;
   private readonly positionAmount = 0.02;
   private readonly slippageBasisPoints = 200n;
 
@@ -103,7 +103,7 @@ export default class CoinTrader {
 
       return sold;
     } catch (error) {
-      logger.error("Error while attempting to sell:", error);
+      logger.error(`Error while attempting to sell: ${error}`);
       return false;
     }
   }
