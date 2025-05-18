@@ -76,23 +76,12 @@ export default class CoinMonitor {
         return;
       }
 
-      const sellTimeout = setTimeout(async () => {
-        try {
-          await trader?.doSell();
-        } catch (error) {
-          logger.error("Error while attempting to sell after timeout:", error);
-        } finally {
-          socket.disconnect();
-        }
-      }, 60000);
-
       const attemptSellLoop = async () => {
         if (!trader) return;
 
         const tradeResult = await trader.attemptSniperSell();
 
         if (tradeResult !== undefined) {
-          clearTimeout(sellTimeout);
           socket.disconnect();
           return;
         }

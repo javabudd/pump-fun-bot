@@ -8,7 +8,7 @@ import {
   PumpFunSDK,
 } from "pumpdotfun-sdk";
 import { logger } from "../logger";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { closeAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 export default class CoinTrader {
   private trades: Array<Trade> = [];
@@ -25,7 +25,7 @@ export default class CoinTrader {
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
   private readonly positionAmount = 0.02;
   private readonly slippageBasisPoints = 300n;
-
+  private readonly maxPositionTime = 60; // max seconds to hold position
   private readonly blacklistedNameStrings = ["test"];
 
   public constructor(
@@ -53,12 +53,13 @@ export default class CoinTrader {
   }
 
   public async closeAccount(): Promise<string> {
-    const account = await this.pumpFun.getBondingCurveAccount(
+    return closeAccount(
+      this.pumpFun.connection,
+      this.buyerSellerKeypair,
       new PublicKey(this.coin.mint),
+      this.buyerSellerKeypair.publicKey,
+      this.buyerSellerKeypair,
     );
-
-    // @TODO close account
-    return this.coin.bonding_curve.toString();
   }
 
   public addTrade(trade: Trade): void {
@@ -81,6 +82,12 @@ export default class CoinTrader {
       !this.buyPrice
     ) {
       return;
+    }
+
+    if (Date.now() - this.buyTimestamp >= this.maxPositionTime * 1000) {
+      logger.warn("Position held to its maximum time, selling...");
+
+      return this.doSell();
     }
 
     const trade = this.getLastTrade();
