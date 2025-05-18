@@ -8,7 +8,7 @@ import {
   PumpFunSDK,
 } from "pumpdotfun-sdk";
 import { logger } from "../logger";
-import { closeAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 export default class CoinTrader {
   private trades: Array<Trade> = [];
@@ -24,7 +24,7 @@ export default class CoinTrader {
   private readonly takeProfitRatio = 1.1; // If price > 110% of buy price, take profit (10% gain)
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
   private readonly positionAmount = 0.02;
-  private readonly buySlippageBasisPoints = 500n;
+  private readonly buySlippageBasisPoints = 600n;
   private readonly sellSlippageBasisPoints = 1000n;
   private readonly maxPositionTime = 60; // max seconds to hold position
   private readonly blacklistedNameStrings = ["test"];
@@ -276,7 +276,7 @@ export default class CoinTrader {
         unitLimit: this.estimateUnitLimitForSell(currentSPLBalance),
         unitPrice: this.estimateUnitPrice(bondingCurve),
       },
-      "finalized",
+      "confirmed",
       "confirmed",
     );
 
