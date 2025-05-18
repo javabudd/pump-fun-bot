@@ -31,7 +31,7 @@ type GlobalAccount = {
     websocketUrl = process.env.WALLET_WEBSOCKET_URL;
   }
 
-  const bondingCurveId = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
+  const programId = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
   const sc = StringCodec();
 
   let connection, keypair;
@@ -58,7 +58,7 @@ type GlobalAccount = {
   });
 
   // @ts-expect-error ignore idl spec for now
-  const anchorProgram = new Program(idl, bondingCurveId, provider);
+  const anchorProgram = new Program(idl, programId, provider);
 
   const [globalPDA] = PublicKey.findProgramAddressSync(
     [Buffer.from("global")],

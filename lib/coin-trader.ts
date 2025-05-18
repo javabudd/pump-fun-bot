@@ -206,7 +206,7 @@ export default class CoinTrader {
       const tx = await this.pumpFun.anchorProgram.methods
         .buy(
           new BN(this.positionAmount),
-          new BN(this.positionAmount + this.positionAmount * 0.05),
+          new BN(this.positionAmount).muln(105).divn(100),
         )
         .preInstructions(feeInstructions)
         .accounts({
