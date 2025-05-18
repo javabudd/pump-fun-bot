@@ -83,7 +83,13 @@ export default class CoinTrader {
       return;
     }
 
-    const trade = this.trades[-1];
+    const trade = this.getLastTrade();
+
+    if (!trade) {
+      logger.warn("No trade data available yet, skipping sell attempt.");
+
+      return;
+    }
 
     const currentPrice =
       (trade.sol_amount + trade.virtual_sol_reserves) /
@@ -299,9 +305,10 @@ export default class CoinTrader {
   private setBuyProperties(): void {
     let virtualSolReserves = this.coin.virtual_sol_reserves;
     let virtualTokenReserves = this.coin.virtual_token_reserves;
-    if (this.trades.length > 0) {
-      virtualSolReserves = this.trades[-1].virtual_sol_reserves;
-      virtualTokenReserves = this.trades[-1].virtual_token_reserves;
+    const lastTrade = this.getLastTrade();
+    if (lastTrade) {
+      virtualSolReserves = lastTrade.virtual_sol_reserves;
+      virtualTokenReserves = lastTrade.virtual_token_reserves;
     }
 
     const estimatedSolReserves =
@@ -369,9 +376,10 @@ export default class CoinTrader {
   private estimateUnitPrice(): number {
     let virtualSolReserves = this.coin.virtual_sol_reserves;
     let virtualTokenReserves = this.coin.virtual_token_reserves;
-    if (this.trades.length > 0) {
-      virtualSolReserves = this.trades[-1].virtual_sol_reserves;
-      virtualTokenReserves = this.trades[-1].virtual_token_reserves;
+    const lastTrade = this.getLastTrade();
+    if (lastTrade) {
+      virtualSolReserves = lastTrade.virtual_sol_reserves;
+      virtualTokenReserves = lastTrade.virtual_token_reserves;
     }
 
     // 1) Marginal price in lamports per token:
@@ -388,13 +396,21 @@ export default class CoinTrader {
   }
 
   private estimateUnitLimitForBuy(solAmount: number): number {
+    let virtualSolReserves = this.coin.virtual_sol_reserves;
+    let virtualTokenReserves = this.coin.virtual_token_reserves;
+    const lastTrade = this.getLastTrade();
+    if (lastTrade) {
+      virtualSolReserves = lastTrade.virtual_sol_reserves;
+      virtualTokenReserves = lastTrade.virtual_token_reserves;
+    }
+
     // 1) How many lamports we’re spending
     const lamportsToSpend = solAmount * LAMPORTS_PER_SOL;
 
     // 2) Get the same base price per token (without buffer)
     const basePrice =
-      this.trades[-1].virtual_sol_reserves /
-      (this.trades[-1].virtual_token_reserves / Math.pow(10, DEFAULT_DECIMALS));
+      virtualSolReserves /
+      (virtualTokenReserves / Math.pow(10, DEFAULT_DECIMALS));
 
     // 3) Use the *buffered* price so we don’t under-estimate
     const priceWithBuffer = basePrice * 1.05;
@@ -422,5 +438,9 @@ export default class CoinTrader {
     units = Math.min(units, this.MAX_UINT32);
 
     return units;
+  }
+
+  private getLastTrade(): Trade | undefined {
+    return this.trades[this.trades.length - 1];
   }
 }
