@@ -1,9 +1,8 @@
 {
   "name": "pump.fun.bot",
   "scripts": {
-    "build": "npx tsc",
     "bot": "npx ts-node bot.ts",
-    "close": "node dist/close.js",
+    "close": "npx ts-node close.ts",
     "go": "npm run build && npm run run"
   },
   "engines": {
