@@ -2,8 +2,7 @@
   "name": "pump.fun.bot",
   "scripts": {
     "bot": "npx ts-node bot.ts",
-    "close": "npx ts-node close.ts",
-    "go": "npm run build && npm run run"
+    "close": "npx ts-node close.ts"
   },
   "engines": {
     "node": ">=23 <24"
