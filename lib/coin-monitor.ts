@@ -62,7 +62,7 @@ export default class CoinMonitor {
           console.error("Error while attempting to sell after timeout:", error);
         }
         socket.disconnect();
-      }, 45000);
+      }, 60000);
 
       socket.on(`tradeCreated:${coin.mint}`, async (data) => {
         if (!trader) {
