@@ -24,7 +24,8 @@ export default class CoinTrader {
   private readonly takeProfitRatio = 1.1; // If price > 110% of buy price, take profit (10% gain)
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
   private readonly positionAmount = 0.02;
-  private readonly slippageBasisPoints = 300n;
+  private readonly buySlippageBasisPoints = 300n;
+  private readonly sellSlippageBasisPoints = 500n;
   private readonly maxPositionTime = 60; // max seconds to hold position
   private readonly blacklistedNameStrings = ["test"];
 
@@ -213,7 +214,7 @@ export default class CoinTrader {
         this.buyerSellerKeypair,
         mintPublicKey,
         BigInt(this.positionAmount * LAMPORTS_PER_SOL),
-        this.slippageBasisPoints,
+        this.buySlippageBasisPoints,
         {
           unitLimit: this.estimateUnitLimitForBuy(
             bondingCurve,
@@ -269,7 +270,7 @@ export default class CoinTrader {
       this.buyerSellerKeypair,
       mintPublicKey,
       BigInt(currentSPLBalance),
-      this.slippageBasisPoints,
+      this.sellSlippageBasisPoints,
       {
         unitLimit: this.estimateUnitLimitForSell(currentSPLBalance),
         unitPrice: this.estimateUnitPrice(bondingCurve),

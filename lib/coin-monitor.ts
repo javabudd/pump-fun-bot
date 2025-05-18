@@ -94,11 +94,16 @@ export default class CoinMonitor {
 
     socket.on("disconnect", async () => {
       if (trader) {
-        trader.closeAccount().then((accountId) => {
-          if (accountId) {
-            logger.info(`Closed account for ${accountId}`);
-          }
-        });
+        trader
+          .closeAccount()
+          .then((accountId) => {
+            if (accountId) {
+              logger.info(`Closed account for ${accountId}`);
+            }
+          })
+          .catch((e) => {
+            logger.error(`Error closing account: ${e}`);
+          });
       }
 
       delete this.monitoredCoins[coin.mint];
