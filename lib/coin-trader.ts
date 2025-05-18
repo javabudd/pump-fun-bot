@@ -25,7 +25,7 @@ export default class CoinTrader {
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
   private readonly positionAmount = 0.02;
   private readonly buySlippageBasisPoints = 600n;
-  private readonly sellSlippageBasisPoints = 1500n;
+  private readonly sellSlippageBasisPoints = 2500n;
   private readonly maxPositionTime = 60; // max seconds to hold position
   private readonly blacklistedNameStrings = ["test"];
 
@@ -419,23 +419,21 @@ export default class CoinTrader {
   }
 
   private estimateUnitLimitForSell(uiAmount: number): number {
-    // Convert UI amount (human-readable tokens) into raw token units
-    let units = uiAmount * Math.pow(10, DEFAULT_DECIMALS);
+    const rawUnits = uiAmount * Math.pow(10, DEFAULT_DECIMALS);
 
-    // Apply a safety buffer to account for slippage during the sell
-    const bufferMultiplier = 0.995; // sell slightly less than full balance (0.5% buffer)
+    // Apply a 1-2% safety margin to avoid bonding curve shifts invalidating the tx
+    const bufferMultiplier = 0.98;
 
-    // Round down to avoid exceeding balance
-    units = Math.floor(units * bufferMultiplier);
+    // Always round down — no ceiling allowed for safety
+    const adjustedUnits = Math.floor(rawUnits * bufferMultiplier);
 
-    // Prevent extremely small sell amounts that could be dust
-    const minUnitsToSell = 10; // adjust as needed
-    if (units < minUnitsToSell) {
+    // Prevent dust or low-value txs
+    const MIN_UNITS = 10;
+    if (adjustedUnits < MIN_UNITS) {
       return 0;
     }
 
-    // Cap to max uint32 to stay safe for on-chain constraints
-    return Math.min(units, this.MAX_UINT32);
+    return Math.min(adjustedUnits, this.MAX_UINT32);
   }
 
   private getLastTrade(): Trade | undefined {
