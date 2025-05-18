@@ -178,6 +178,8 @@ export default class CoinTrader {
 
     const currentSPLBalance = await this.getSPLBalance(mintPublicKey);
     if (currentSPLBalance === null) {
+      logger.error("Balance empty...");
+
       return false;
     }
 
