@@ -131,7 +131,7 @@ export default class CoinTrader {
           unitLimit: this.computeUnits,
           unitPrice: this.priorityFee,
         },
-        "processed",
+        "confirmed",
       );
     } catch (error) {
       logger.error(`Error while attempting to buy: ${error}`);
