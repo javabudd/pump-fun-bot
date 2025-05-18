@@ -54,13 +54,14 @@ export default class CoinTrader {
   }
 
   public async closeAccount(): Promise<string> {
-    return closeAccount(
-      this.pumpFun.connection,
-      this.buyerSellerKeypair,
-      new PublicKey(this.coin.mint),
-      this.buyerSellerKeypair.publicKey,
-      this.buyerSellerKeypair,
-    );
+    return this.coin.mint;
+    // return closeAccount(
+    //   this.pumpFun.connection,
+    //   this.buyerSellerKeypair,
+    //   new PublicKey(this.coin.mint),
+    //   this.buyerSellerKeypair.publicKey,
+    //   this.buyerSellerKeypair,
+    // );
   }
 
   public addTrade(trade: Trade): void {
@@ -386,17 +387,11 @@ export default class CoinTrader {
     const virtualSolReserves = Number(bondingCurve.virtualSolReserves);
     const virtualTokenReserves = Number(bondingCurve.virtualTokenReserves);
 
-    // 1) Marginal price in lamports per token:
-    //    reserves are lamports and raw token units
     const pricePerToken =
       virtualSolReserves /
       (virtualTokenReserves / Math.pow(10, DEFAULT_DECIMALS));
 
-    // 2) Apply buffer for slippage (e.g. +5%)
-    const bufferedPrice = pricePerToken * 1.05;
-
-    // 3) Round up to an integer, clamp to u32 max
-    return Math.min(this.MAX_UINT32, Math.ceil(bufferedPrice));
+    return Math.min(this.MAX_UINT32, Math.ceil(pricePerToken));
   }
 
   private estimateUnitLimitForBuy(
@@ -406,30 +401,15 @@ export default class CoinTrader {
     const virtualSolReserves = Number(bondingCurve.virtualSolReserves);
     const virtualTokenReserves = Number(bondingCurve.virtualTokenReserves);
 
-    // 1) How many lamports we’re spending
     const lamportsToSpend = solAmount * LAMPORTS_PER_SOL;
 
-    // 2) Get the same base price per token (without buffer)
     const basePrice =
       virtualSolReserves /
       (virtualTokenReserves / Math.pow(10, DEFAULT_DECIMALS));
+    const expectedTokens = lamportsToSpend / basePrice;
+    const units = Math.ceil(expectedTokens * Math.pow(10, DEFAULT_DECIMALS)); // round up for safety
 
-    // 3) Use the *buffered* price so we don’t under-estimate
-    const priceWithBuffer = basePrice * 1.05;
-
-    // 4) Tokens you expect to receive (as a float, in “whole” tokens)
-    const expectedTokens = lamportsToSpend / priceWithBuffer;
-
-    // 5) Scale to the token’s atomic units (decimals)
-    let units = Math.floor(expectedTokens * Math.pow(10, DEFAULT_DECIMALS));
-
-    // 6) Add a small extra buffer (e.g. 10%) so rounding/trades don’t fail
-    units = Math.floor(units * 1.1);
-
-    // 7) Clamp to u32 max
-    units = Math.min(units, this.MAX_UINT32);
-
-    return units;
+    return Math.min(units, this.MAX_UINT32);
   }
 
   private estimateUnitLimitForSell(uiAmount: number): number {
