@@ -1,9 +1,19 @@
 import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
-import { Keypair, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+} from "@solana/web3.js";
 
-import { BondingCurveAccount, PumpFunSDK } from "pumpdotfun-sdk";
+import {
+  BondingCurveAccount,
+  DEFAULT_DECIMALS,
+  PumpFunSDK,
+} from "pumpdotfun-sdk";
 import { logger } from "../logger";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 export default class CoinTrader {
   private trades: Array<Trade> = [];
@@ -20,8 +30,8 @@ export default class CoinTrader {
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
   private readonly computeUnits = 250_000;
   private readonly priorityFee = 150_000;
-  private readonly positionAmount = 0.025;
-  private readonly slippageBasisPoints = 300n;
+  private readonly positionAmount = 0.02;
+  private readonly slippageBasisPoints = 200n;
 
   private readonly blacklistedNameStrings = ["test"];
   private readonly decimals = 9;
@@ -142,14 +152,14 @@ export default class CoinTrader {
 
     if (buyResults.success) {
       logger.buy(
-        `Buy transaction successful: ${buyResults.results?.transaction.message}`,
+        `Buy transaction successful: ${buyResults.results?.blockTime}`,
       );
 
       this.setBuyProperties();
 
       return true;
     } else {
-      logger.error(`Buy failed: ${buyResults.error || "Unknown error"}`);
+      logger.error(`Buy failed: ${buyResults.error}`);
 
       return false;
     }
@@ -164,31 +174,36 @@ export default class CoinTrader {
 
     const mintPublicKey = new PublicKey(this.coin.mint);
 
-    if (this.positionAmount) {
-      const sellResults = await this.pumpFun.sell(
-        this.buyerSellerKeypair,
-        mintPublicKey,
-        BigInt(this.positionAmount * LAMPORTS_PER_SOL),
-        this.slippageBasisPoints,
-        {
-          unitLimit: this.computeUnits,
-          unitPrice: this.priorityFee,
-        },
-        "confirmed",
-        "confirmed",
+    const currentSPLBalance = await this.getSPLBalance(mintPublicKey);
+    if (currentSPLBalance === null) {
+      return false;
+    }
+
+    logger.info(`Selling ${currentSPLBalance} ${this.coin.name}`);
+
+    const sellResults = await this.pumpFun.sell(
+      this.buyerSellerKeypair,
+      mintPublicKey,
+      BigInt(currentSPLBalance * Math.pow(10, DEFAULT_DECIMALS)),
+      this.slippageBasisPoints,
+      {
+        unitLimit: this.computeUnits,
+        unitPrice: this.priorityFee,
+      },
+      "finalized",
+      "confirmed",
+    );
+
+    if (sellResults.success) {
+      logger.sell(
+        `Sell transaction successful: ${sellResults.results?.blockTime}`,
       );
 
-      if (sellResults.success) {
-        logger.sell(
-          `Sell transaction successful: ${sellResults.results?.transaction.message}`,
-        );
+      return true;
+    } else {
+      logger.error(`Sell failed: ${sellResults.error}`);
 
-        return true;
-      } else {
-        logger.error("Sell failed");
-
-        return false;
-      }
+      return false;
     }
 
     logger.error("No position to sell");
@@ -332,5 +347,26 @@ export default class CoinTrader {
     }
 
     throw new Error("Bonding curve account not found after retries");
+  }
+
+  private async getSPLBalance(
+    mintAddress: PublicKey,
+    allowOffCurve: boolean = false,
+  ): Promise<number | null> {
+    try {
+      const ata = getAssociatedTokenAddressSync(
+        mintAddress,
+        this.buyerSellerKeypair.publicKey,
+        allowOffCurve,
+      );
+      const balance = await this.pumpFun.connection.getTokenAccountBalance(
+        ata,
+        "processed",
+      );
+      return balance.value.uiAmount;
+    } catch (e) {
+      logger.error(`Failed retrieving balance ${e}`);
+    }
+    return null;
   }
 }
