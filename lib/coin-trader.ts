@@ -1,22 +1,13 @@
 import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
+import { Keypair, PublicKey } from "@solana/web3.js";
+
 import {
-  ComputeBudgetProgram,
-  PublicKey,
-  SystemProgram,
-  SYSVAR_RENT_PUBKEY,
-  TransactionMessage,
-  VersionedTransaction,
-} from "@solana/web3.js";
+  DEFAULT_COMMITMENT,
+  DEFAULT_DECIMALS,
+  PumpFunSDK,
+} from "pumpdotfun-sdk";
 import { BN } from "@project-serum/anchor";
-import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  closeAccount,
-  createAssociatedTokenAccountInstruction,
-  getAssociatedTokenAddressSync,
-  TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
-import { PumpFun } from "../types/pump-fun";
 import { Buffer } from "buffer";
 import { logger } from "../logger";
 
@@ -33,17 +24,17 @@ export default class CoinTrader {
   private readonly stopLossRatio = 0.95; // If price < 95% of buy price, sell (5% drop)
   private readonly takeProfitRatio = 1.1; // If price > 110% of buy price, take profit (10% gain)
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
-  private readonly computeUnits = 200_000;
-  private readonly priorityFee = 150000;
+  private readonly computeUnits = 250_000;
+  private readonly priorityFee = 150_000;
   private readonly positionAmount = 500 * 1_000_000_000;
-  private readonly pumpFunAuthority =
-    "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1";
+  private readonly slippageBasisPoints = 100n;
 
   private readonly blacklistedNameStrings = ["test"];
   private readonly decimals = 9;
 
   public constructor(
-    private readonly pumpFun: PumpFun,
+    private readonly pumpFun: PumpFunSDK,
+    private readonly buyerSellerKeypair: Keypair,
     private readonly coin: Coin,
     private readonly asMock: boolean = false,
   ) {
@@ -59,7 +50,7 @@ export default class CoinTrader {
       !this.isNameBlacklisted(this.coin.name) &&
       (this.coin.twitter || this.coin.telegram)
     ) {
-      return this.buy();
+      return this.buyTokens();
     } else {
       return false;
     }
@@ -70,28 +61,13 @@ export default class CoinTrader {
       return;
     }
 
-    try {
-      await closeAccount(
-        this.pumpFun.connection,
-        this.pumpFun.keypair,
-        this.associatedUserAddress,
-        this.pumpFun.keypair.publicKey,
-        this.pumpFun.keypair,
-        [],
-        {
-          maxRetries: 10,
-          skipPreflight: true,
-          commitment: "confirmed",
-        },
-      );
-    } catch {
-      logger.error(
-        `Failed to close associated token account: ${this.associatedUserAddress?.toBase58()}`,
-      );
-      return;
-    }
+    const account = await this.pumpFun.getBondingCurveAccount(
+      new PublicKey(this.coin.mint),
+    );
 
-    return this.associatedUserAddress?.toBase58();
+    logger.info(`Bonding account to close: ${account}`);
+
+    // @TODO close account
   }
 
   public async addTrade(trade: Trade): Promise<boolean | undefined> {
@@ -113,7 +89,7 @@ export default class CoinTrader {
   public async doSell() {
     try {
       this.isPlacingSale = true;
-      const sold = await this.sell();
+      const sold = await this.sellTokens();
       if (sold) {
         logger.info("Position closed successfully.");
       } else {
@@ -133,7 +109,7 @@ export default class CoinTrader {
     }
   }
 
-  private async buy(): Promise<boolean> {
+  private async buyTokens(): Promise<boolean> {
     const url = `https://pump.fun/coin/${this.coin.mint}`;
     const isMockString = this.asMock ? " mock " : " ";
     logger.attemptBuy(
@@ -146,173 +122,77 @@ export default class CoinTrader {
       return true;
     }
 
-    const mint = new PublicKey(this.coin.mint);
-    this.associatedUserAddress = getAssociatedTokenAddressSync(
-      mint,
-      this.pumpFun.keypair.publicKey,
-      false,
+    const mintPublicKey = new PublicKey(this.coin.mint);
+    const buyResults = await this.pumpFun.buy(
+      this.buyerSellerKeypair,
+      mintPublicKey,
+      BigInt(this.positionAmount * Math.pow(10, DEFAULT_DECIMALS)),
+      this.slippageBasisPoints,
+      {
+        unitLimit: this.computeUnits,
+        unitPrice: this.priorityFee,
+      },
+      DEFAULT_COMMITMENT,
     );
 
-    logger.info("Creating associated token account...");
-
-    const latestBlockhash =
-      await this.pumpFun.connection.getLatestBlockhash("confirmed");
-    const feeInstructions = [
-      ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: this.priorityFee,
-      }),
-      ComputeBudgetProgram.setComputeUnitLimit({
-        units: this.computeUnits,
-      }),
-    ];
-
-    const message = new TransactionMessage({
-      payerKey: this.pumpFun.keypair.publicKey,
-      recentBlockhash: latestBlockhash.blockhash,
-      instructions: [
-        ...feeInstructions,
-        createAssociatedTokenAccountInstruction(
-          this.pumpFun.keypair.publicKey,
-          this.associatedUserAddress!,
-          this.pumpFun.keypair.publicKey,
-          mint,
-          TOKEN_PROGRAM_ID,
-          ASSOCIATED_TOKEN_PROGRAM_ID,
-        ),
-      ],
-    }).compileToV0Message();
-
-    const versionedTransaction = new VersionedTransaction(message);
-    versionedTransaction.sign([this.pumpFun.keypair]);
-
-    try {
-      await this.pumpFun.connection.sendRawTransaction(
-        versionedTransaction.serialize(),
-        {
-          maxRetries: 1,
-          skipPreflight: false,
-        },
+    if (buyResults.success) {
+      logger.buy(
+        "Bonding curve after buy",
+        await this.pumpFun.getBondingCurveAccount(mintPublicKey),
       );
-    } catch {
-      logger.error("Associated token account creation failed!");
-      return false;
-    }
 
-    logger.info(
-      `Associated token account created: ${this.associatedUserAddress.toBase58()}`,
-    );
-
-    try {
-      const tx = await this.pumpFun.anchorProgram.methods
-        .buy(
-          new BN(this.positionAmount),
-          new BN(this.positionAmount).muln(105).divn(100),
-        )
-        .preInstructions(feeInstructions)
-        .accounts({
-          global: this.pumpFun.global.pda,
-          user: this.pumpFun.keypair.publicKey,
-          mint,
-          feeRecipient: this.pumpFun.global.feeRecipient,
-          bondingCurve: new PublicKey(this.coin.bonding_curve),
-          associatedBondingCurve: new PublicKey(
-            this.coin.associated_bonding_curve,
-          ),
-          associatedUser: this.associatedUserAddress,
-          rent: SYSVAR_RENT_PUBKEY,
-          systemProgram: SystemProgram.programId,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          eventAuthority: new PublicKey(this.pumpFunAuthority),
-          program: this.pumpFun.anchorProgram.programId,
-        })
-        .signers([this.pumpFun.keypair])
-        .rpc({ maxRetries: 10, commitment: "processed", skipPreflight: false });
-
-      logger.buy(`Buy transaction successful: ${tx}`);
+      logger.buy(`Buy transaction successful: ${buyResults}`);
 
       this.setBuyProperties();
 
       return true;
-    } catch (e: unknown) {
-      logger.error(`Buy failed: ${e}`);
+    } else {
+      logger.error("Buy failed");
 
       return false;
     }
   }
 
-  private async sell(slippageTolerance: number = 0.1): Promise<boolean> {
+  private async sellTokens(): Promise<boolean> {
     if (this.asMock) {
       logger.attemptSell("Executing mock sell...");
 
       return true;
     }
 
-    const mint = new PublicKey(this.coin.mint);
+    const mintPublicKey = new PublicKey(this.coin.mint);
 
-    if (!this.associatedUserAddress) {
-      this.associatedUserAddress = getAssociatedTokenAddressSync(
-        mint,
-        this.pumpFun.keypair.publicKey,
-        false,
+    if (this.positionAmount) {
+      const sellResults = await this.pumpFun.sell(
+        this.buyerSellerKeypair,
+        mintPublicKey,
+        BigInt(this.positionAmount * Math.pow(10, DEFAULT_DECIMALS)),
+        this.slippageBasisPoints,
+        {
+          unitLimit: this.computeUnits,
+          unitPrice: this.priorityFee,
+        },
       );
+
+      if (sellResults.success) {
+        logger.sell(
+          "Bonding curve after sell",
+          await this.pumpFun.getBondingCurveAccount(mintPublicKey),
+        );
+
+        logger.sell(`Sell transaction successful: ${sellResults}`);
+
+        return true;
+      } else {
+        logger.error("Sell failed");
+
+        return false;
+      }
     }
 
-    let expectedSolOutput;
-    try {
-      expectedSolOutput = await this.getExpectedSolOutput(this.positionAmount);
-    } catch {
-      return false;
-    }
+    logger.error("No position to sell");
 
-    const slippageMultiplier = new BN(10000 - slippageTolerance * 10000).div(
-      new BN(10000),
-    );
-    const minSolOutput = expectedSolOutput.mul(slippageMultiplier);
-
-    logger.attemptSell(
-      `Executing sell for "${this.coin.name}" with slippage ${slippageTolerance} and min output ${minSolOutput}...`,
-    );
-
-    try {
-      const transaction = await this.pumpFun.anchorProgram.methods
-        .sell(new BN(this.positionAmount), new BN(minSolOutput))
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitPrice({
-            microLamports: this.priorityFee,
-          }),
-          ComputeBudgetProgram.setComputeUnitLimit({
-            units: this.computeUnits,
-          }),
-        ])
-        .accounts({
-          global: this.pumpFun.global.pda,
-          user: this.pumpFun.keypair.publicKey,
-          mint,
-          feeRecipient: this.pumpFun.global.feeRecipient,
-          bondingCurve: new PublicKey(this.coin.bonding_curve),
-          associatedBondingCurve: new PublicKey(
-            this.coin.associated_bonding_curve,
-          ),
-          associatedUser: this.associatedUserAddress,
-          rent: SYSVAR_RENT_PUBKEY,
-          systemProgram: SystemProgram.programId,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          eventAuthority: new PublicKey(this.pumpFunAuthority),
-          program: this.pumpFun.anchorProgram.programId,
-        })
-        .signers([this.pumpFun.keypair])
-        .rpc({
-          maxRetries: 3,
-          commitment: "confirmed",
-          skipPreflight: true,
-        });
-
-      logger.sell(`Sell transaction successful: ${transaction}`);
-      return true;
-    } catch (err) {
-      logger.error("Sell transaction failed!", err);
-      return false;
-    }
+    return false;
   }
 
   private async attemptSniperSell(trade: Trade): Promise<boolean | undefined> {
@@ -321,7 +201,7 @@ export default class CoinTrader {
       this.isPlacingSale ||
       !this.buyTimestamp ||
       !this.buyPrice ||
-      trade.user === this.pumpFun.keypair.publicKey.toBase58()
+      trade.user === this.pumpFun.program.provider.publicKey?.toBase58()
     ) {
       return;
     }

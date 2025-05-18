@@ -2,8 +2,9 @@ import { io } from "socket.io-client";
 import CoinTrader from "./coin-trader";
 import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
-import { PumpFun } from "../types/pump-fun";
 import { logger } from "../logger";
+import { PumpFunSDK } from "pumpdotfun-sdk";
+import { Keypair } from "@solana/web3.js";
 
 export default class CoinMonitor {
   private readonly pumpFunSocketIoUrl = "https://frontend-api-v3.pump.fun";
@@ -11,7 +12,8 @@ export default class CoinMonitor {
   private monitoredCoins: Record<string, Coin> = {};
 
   public constructor(
-    private readonly pumpFun: PumpFun,
+    private readonly pumpFun: PumpFunSDK,
+    private readonly buyerSellerKeypair: Keypair,
     private readonly maximumMonitoredCoins = 1,
     private readonly asMock = false,
   ) {
@@ -40,6 +42,7 @@ export default class CoinMonitor {
   public subscribeToCoinTrades(coin: Coin): void {
     let trader: CoinTrader | null = new CoinTrader(
       this.pumpFun,
+      this.buyerSellerKeypair,
       coin,
       this.asMock,
     );
