@@ -315,18 +315,24 @@ export default class CoinTrader {
 
   private async waitForBondingCurve(
     mint: PublicKey,
-    maxRetries = 5,
-    delayMs = 300,
+    maxRetries = 15,
+    baseDelayMs = 500,
   ) {
     for (let i = 0; i < maxRetries; i++) {
       try {
-        const bondingCurve = await this.pumpFun.getBondingCurveAccount(mint);
+        const bondingCurve = await this.pumpFun.getBondingCurveAccount(
+          mint,
+          "confirmed",
+        );
         if (bondingCurve) return bondingCurve;
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e) {
-        logger.info("Bonding curve not ready yet...");
+        logger.info(`Bonding curve not ready yet... (retry ${i + 1})`);
       }
-      await new Promise((res) => setTimeout(res, delayMs));
+
+      const delay = baseDelayMs * Math.pow(2, i);
+      logger.info(`Waiting ${delay}ms before next attempt...`);
+      await new Promise((res) => setTimeout(res, delay));
     }
 
     throw new Error("Bonding curve account not found after retries");
