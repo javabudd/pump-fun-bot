@@ -5,6 +5,7 @@ import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { AnchorProvider, Program, Wallet } from "@project-serum/anchor";
 import idl from "./idl.json";
 import { PumpFun } from "./types/pump-fun";
+import { logger } from "./logger";
 
 process.loadEnvFile(".env");
 
@@ -46,7 +47,7 @@ type GlobalAccount = {
 
     keypair = Keypair.fromSecretKey(privateKeyArray);
   } catch (err) {
-    console.error("Error loading Solana wallet:", err);
+    logger.error("Error loading Solana wallet:", err);
 
     return;
   }
@@ -69,7 +70,7 @@ type GlobalAccount = {
   )) as unknown as GlobalAccount;
 
   if (!globalAccount) {
-    console.error("No global account found!");
+    logger.error("No global account found!");
 
     return;
   }
@@ -100,11 +101,11 @@ type GlobalAccount = {
       pass: "lW5a9y20NceF6AE9",
     });
 
-    console.log("Connected to NATS WebSocket server");
+    logger.info("Connected to NATS WebSocket server");
 
     const sub: Subscription = nc.subscribe("newCoinCreated.prod");
 
-    console.log("Subscribed to newCoinCreated.prod");
+    logger.info("Subscribed to newCoinCreated.prod");
 
     for await (const msg of sub) {
       const coin = JSON.parse(sc.decode(msg.data));
@@ -114,6 +115,6 @@ type GlobalAccount = {
 
     await nc.closed();
   } catch (err) {
-    console.error("Error connecting to NATS WebSocket:", err);
+    logger.error("Error connecting to NATS WebSocket:", err);
   }
 })();

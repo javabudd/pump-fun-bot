@@ -18,6 +18,7 @@ import {
 } from "@solana/spl-token";
 import { PumpFun } from "../types/pump-fun";
 import { Buffer } from "buffer";
+import { logger } from "../logger";
 
 export default class CoinTrader {
   private trades: Array<Trade> = [];
@@ -85,7 +86,7 @@ export default class CoinTrader {
         },
       );
     } catch {
-      console.error(
+      logger.error(
         `Failed to close associated token account: ${this.associatedUserAddress?.toBase58()}`,
       );
       return;
@@ -102,7 +103,7 @@ export default class CoinTrader {
     this.trades.push(trade);
 
     if (trade.raydium_pool !== null) {
-      console.log(`Raydium reached for ${this.coin.name}!`);
+      logger.info(`Raydium reached for ${this.coin.name}!`);
 
       return;
     }
@@ -115,9 +116,9 @@ export default class CoinTrader {
       this.isPlacingSale = true;
       const sold = await this.sell();
       if (sold) {
-        console.log("Position closed successfully.");
+        logger.info("Position closed successfully.");
       } else {
-        console.log("Sell attempt failed.");
+        logger.info("Sell attempt failed.");
       }
       this.isPlacingSale = false;
       this.hasPosition = false;
@@ -128,14 +129,14 @@ export default class CoinTrader {
 
       return sold;
     } catch (error) {
-      console.error("Error while attempting to sell:", error);
+      logger.error("Error while attempting to sell:", error);
       return false;
     }
   }
 
   private async buy(): Promise<boolean> {
     const url = `https://pump.fun/coin/${this.coin.mint}`;
-    console.log(`Executing buy for ${this.coin.name} at ${url}...`);
+    logger.info(`Executing buy for ${this.coin.name} at ${url}...`);
 
     if (this.asMock) {
       this.setBuyProperties();
@@ -150,7 +151,7 @@ export default class CoinTrader {
       false,
     );
 
-    console.log("Creating associated token account...");
+    logger.info("Creating associated token account...");
 
     const latestBlockhash =
       await this.pumpFun.connection.getLatestBlockhash("confirmed");
@@ -191,17 +192,17 @@ export default class CoinTrader {
         },
       );
     } catch {
-      console.error("Associated token account creation failed!");
+      logger.error("Associated token account creation failed!");
       return false;
     }
 
-    console.log(
+    logger.info(
       "Associated token account created:",
       this.associatedUserAddress.toBase58(),
     );
 
     try {
-      console.log("Executing buy transaction...");
+      logger.info("Executing buy transaction...");
 
       const transaction = await this.pumpFun.anchorProgram.methods
         .buy(
@@ -232,20 +233,20 @@ export default class CoinTrader {
           skipPreflight: true,
         });
 
-      console.log(`Buy transaction successful: ${transaction}`);
+      logger.info(`Buy transaction successful: ${transaction}`);
 
       this.setBuyProperties();
 
       return true;
     } catch (error) {
-      console.error("Buy transaction failed: ", error);
+      logger.error("Buy transaction failed: ", error);
       return false;
     }
   }
 
   private async sell(slippageTolerance: number = 0.1): Promise<boolean> {
     if (this.asMock) {
-      console.log("Executing mock sell...");
+      logger.info("Executing mock sell...");
 
       return true;
     }
@@ -272,7 +273,7 @@ export default class CoinTrader {
     );
     const minSolOutput = expectedSolOutput.mul(slippageMultiplier);
 
-    console.log(
+    logger.info(
       `Executing sell for "${this.coin.name}" with slippage ${slippageTolerance} and min output ${minSolOutput}...`,
     );
 
@@ -310,10 +311,10 @@ export default class CoinTrader {
           skipPreflight: true,
         });
 
-      console.log(`Sell transaction successful: ${transaction}`);
+      logger.info(`Sell transaction successful: ${transaction}`);
       return true;
     } catch (err) {
-      console.error("Sell transaction failed!", err);
+      logger.error("Sell transaction failed!", err);
       return false;
     }
   }
@@ -335,7 +336,7 @@ export default class CoinTrader {
         Math.pow(10, this.decimals));
 
     if (!currentPrice) {
-      console.warn("No current price available, skipping stop-loss check.");
+      logger.warn("No current price available, skipping stop-loss check.");
       return;
     }
 
@@ -351,11 +352,11 @@ export default class CoinTrader {
 
     let shouldSell = false;
 
-    console.log(`current: ${currentPrice}, stop: ${stopLossThreshold}`);
+    logger.info(`current: ${currentPrice}, stop: ${stopLossThreshold}`);
 
     if (currentPrice < stopLossThreshold) {
       shouldSell = true;
-      console.log(
+      logger.info(
         `Stop-loss triggered. Current: ${currentPrice}, Threshold: ${stopLossThreshold}`,
       );
     } else if (!this.trailingStopMode && currentPrice >= takeProfitThreshold) {
@@ -363,7 +364,7 @@ export default class CoinTrader {
       // Instead of selling immediately, let's enter trailing stop mode
       this.trailingStopMode = true;
       this.highestPriceSinceBuy = currentPrice; // Reset the highest price in trailing mode
-      console.log(
+      logger.info(
         `Take-profit threshold reached. Entering trailing stop mode at price: ${currentPrice}`,
       );
     } else if (this.trailingStopMode && this.highestPriceSinceBuy) {
@@ -372,7 +373,7 @@ export default class CoinTrader {
         this.highestPriceSinceBuy * (1 - this.trailingStopPercent);
       if (currentPrice < trailingStopTrigger) {
         shouldSell = true;
-        console.log(
+        logger.info(
           `Trailing stop triggered. Current: ${currentPrice}, Trigger: ${trailingStopTrigger}, Peak: ${this.highestPriceSinceBuy}`,
         );
       }
@@ -382,7 +383,7 @@ export default class CoinTrader {
     // if external signals (pump ending or whales selling) appear, consider selling.
     if (!shouldSell && (isPumpEnding || whalesSelling)) {
       shouldSell = true;
-      console.log(
+      logger.info(
         "Pump-ending or whale-selling signal detected, exiting position.",
       );
     }

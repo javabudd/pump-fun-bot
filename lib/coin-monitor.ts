@@ -3,6 +3,7 @@ import CoinTrader from "./coin-trader";
 import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
 import { PumpFun } from "../types/pump-fun";
+import { logger } from "../logger";
 
 export default class CoinMonitor {
   private readonly pumpFunSocketIoUrl = "https://frontend-api-v3.pump.fun";
@@ -28,7 +29,7 @@ export default class CoinMonitor {
       return;
     }
 
-    console.info(`Monitoring coin ${newToken.name}`);
+    logger.info(`Monitoring coin ${newToken.name}`);
 
     newToken.monitorStart = new Date().toUTCString();
     this.monitoredCoins[newToken.mint] = newToken;
@@ -65,7 +66,7 @@ export default class CoinMonitor {
         try {
           await trader?.doSell();
         } catch (error) {
-          console.error("Error while attempting to sell after timeout:", error);
+          logger.error("Error while attempting to sell after timeout:", error);
         }
         socket.disconnect();
       }, 60000);
@@ -88,7 +89,7 @@ export default class CoinMonitor {
       if (trader) {
         trader.closeAccount().then((accountId) => {
           if (accountId) {
-            console.log(`Closed account for ${accountId}`);
+            logger.info(`Closed account for ${accountId}`);
           }
         });
       }
@@ -98,7 +99,7 @@ export default class CoinMonitor {
     });
 
     socket.on("connect_error", (err) => {
-      console.error("Socket connection error:", err);
+      logger.error("Socket connection error:", err);
       delete this.monitoredCoins[coin.mint];
       trader = null;
     });
