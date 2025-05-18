@@ -138,7 +138,7 @@ export default class CoinTrader {
         BigInt(this.positionAmount * LAMPORTS_PER_SOL),
         this.slippageBasisPoints,
         {
-          unitLimit: this.estimateUnitLimit(this.positionAmount),
+          unitLimit: this.estimateUnitLimitForBuy(this.positionAmount),
           unitPrice: this.estimateUnitPrice(),
         },
         "confirmed",
@@ -191,7 +191,7 @@ export default class CoinTrader {
       BigInt(currentSPLBalance * Math.pow(10, DEFAULT_DECIMALS)),
       this.slippageBasisPoints,
       {
-        unitLimit: this.estimateUnitLimit(this.positionAmount),
+        unitLimit: this.estimateUnitLimitForSell(currentSPLBalance),
         unitPrice: this.estimateUnitPrice(),
       },
       "finalized",
@@ -387,7 +387,7 @@ export default class CoinTrader {
     return unitPrice;
   }
 
-  private estimateUnitLimit(solAmount: number): number {
+  private estimateUnitLimitForBuy(solAmount: number): number {
     // 1) How many lamports we’re spending
     const lamportsToSpend = solAmount * LAMPORTS_PER_SOL;
 
@@ -409,6 +409,16 @@ export default class CoinTrader {
     units = Math.floor(units * 1.1);
 
     // 7) Clamp to u32 max
+    units = Math.min(units, this.MAX_UINT32);
+
+    return units;
+  }
+
+  private estimateUnitLimitForSell(uiAmount: number): number {
+    let units = Math.floor(uiAmount * Math.pow(10, this.decimals)); // scale to raw units
+
+    units = Math.floor(units * 0.99); // 1% buffer down to avoid rounding issues
+
     units = Math.min(units, this.MAX_UINT32);
 
     return units;
