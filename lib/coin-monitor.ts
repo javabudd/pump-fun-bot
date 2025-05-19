@@ -81,7 +81,7 @@ export default class CoinMonitor {
 
         const tradeResult = await trader.attemptSniperSell();
 
-        if (tradeResult !== undefined) {
+        if (tradeResult === true) {
           socket.disconnect();
           return;
         }

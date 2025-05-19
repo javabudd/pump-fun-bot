@@ -183,6 +183,7 @@ export default class CoinTrader {
     } else {
       logger.info("Sell attempt failed.");
     }
+
     this.isPlacingSale = false;
     this.hasPosition = false;
     this.highestPriceSinceBuy = null;
@@ -230,19 +231,11 @@ export default class CoinTrader {
       return false;
     }
 
-    if (buyResults.success) {
-      logger.buy(
-        `Buy transaction successful: ${buyResults.results?.blockTime}`,
-      );
+    logger.buy(`Buy transaction successful: ${buyResults.results?.blockTime}`);
 
-      this.setBuyProperties();
+    this.setBuyProperties();
 
-      return true;
-    } else {
-      logger.error(`Buy failed: ${buyResults.error}`);
-
-      return false;
-    }
+    return true;
   }
 
   private async sellTokens(): Promise<boolean> {
