@@ -258,30 +258,31 @@ export default class CoinTrader {
 
     logger.info(`Selling ${currentSPLBalance} ${this.coin.name}`);
 
-    const sellResults = await this.pumpFun.sell(
-      this.buyerSellerKeypair,
-      mintPublicKey,
-      BigInt(currentSPLBalance),
-      this.sellSlippageBasisPoints,
-      {
-        unitLimit: this.computeUnits,
-        unitPrice: this.computeUnitPrice,
-      },
-      "processed",
-      "confirmed",
-    );
-
-    if (sellResults.success) {
-      logger.sell(
-        `Sell transaction successful: ${sellResults.results?.blockTime}`,
+    let sellResults;
+    try {
+      sellResults = await this.pumpFun.sell(
+        this.buyerSellerKeypair,
+        mintPublicKey,
+        BigInt(currentSPLBalance),
+        this.sellSlippageBasisPoints,
+        {
+          unitLimit: this.computeUnits,
+          unitPrice: this.computeUnitPrice,
+        },
+        "processed",
+        "confirmed",
       );
-
-      return true;
-    } else {
-      logger.error(`Sell failed: ${sellResults.error}`);
+    } catch (error) {
+      logger.error(`Error while attempting to sell: ${error}`);
 
       return false;
     }
+
+    logger.sell(
+      `Sell transaction successful: ${sellResults.results?.blockTime}`,
+    );
+
+    return true;
   }
 
   private checkPumpEndingSignal(): boolean {
