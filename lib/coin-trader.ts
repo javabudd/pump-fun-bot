@@ -28,7 +28,7 @@ export default class CoinTrader {
   private readonly maxPositionTime = 60; // max seconds to hold position
   private readonly blacklistedNameStrings = ["test"];
   private readonly computeUnits = 200_000;
-  private readonly computeUnitPrice = 1_000_000_000;
+  private readonly computeUnitPrice = 150_000;
 
   public constructor(
     private readonly pumpFun: PumpFunSDK,
