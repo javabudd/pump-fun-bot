@@ -19,15 +19,16 @@ export default class CoinTrader {
   private highestPriceSinceBuy: number | null = null;
   private trailingStopMode = false; // Once take profit threshold is hit, we activate trailing stop mode
 
-  private readonly MAX_UINT32 = 4294967295;
   private readonly stopLossRatio = 0.95; // If price < 95% of buy price, sell (5% drop)
   private readonly takeProfitRatio = 1.1; // If price > 110% of buy price, take profit (10% gain)
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
   private readonly positionAmount = 0.02;
-  private readonly buySlippageBasisPoints = 600n;
+  private readonly buySlippageBasisPoints = 1000n;
   private readonly sellSlippageBasisPoints = 2500n;
   private readonly maxPositionTime = 60; // max seconds to hold position
   private readonly blacklistedNameStrings = ["test"];
+  private readonly computeUnits = 200_000;
+  private readonly computeUnitPrice = 1_000_000_000;
 
   public constructor(
     private readonly pumpFun: PumpFunSDK,
@@ -207,7 +208,7 @@ export default class CoinTrader {
 
     const mintPublicKey = new PublicKey(this.coin.mint);
 
-    const bondingCurve = await this.waitForBondingCurve(mintPublicKey);
+    await this.waitForBondingCurve(mintPublicKey);
 
     let buyResults;
     try {
@@ -217,11 +218,8 @@ export default class CoinTrader {
         BigInt(this.positionAmount * LAMPORTS_PER_SOL),
         this.buySlippageBasisPoints,
         {
-          unitLimit: this.estimateUnitLimitForBuy(
-            bondingCurve,
-            this.positionAmount,
-          ),
-          unitPrice: this.estimateUnitPrice(bondingCurve),
+          unitLimit: this.computeUnits,
+          unitPrice: this.computeUnitPrice,
         },
         "processed",
         "confirmed",
@@ -256,7 +254,7 @@ export default class CoinTrader {
 
     const mintPublicKey = new PublicKey(this.coin.mint);
 
-    const bondingCurve = await this.waitForBondingCurve(mintPublicKey);
+    await this.waitForBondingCurve(mintPublicKey);
 
     const currentSPLBalance = await this.getSPLBalance(mintPublicKey);
     if (currentSPLBalance === null) {
@@ -273,8 +271,8 @@ export default class CoinTrader {
       BigInt(currentSPLBalance),
       this.sellSlippageBasisPoints,
       {
-        unitLimit: this.estimateUnitLimitForSell(currentSPLBalance),
-        unitPrice: this.estimateUnitPrice(bondingCurve),
+        unitLimit: this.computeUnits,
+        unitPrice: this.computeUnitPrice,
       },
       "confirmed",
       "confirmed",
@@ -381,59 +379,6 @@ export default class CoinTrader {
       logger.error(`Failed retrieving balance ${e}`);
     }
     return null;
-  }
-
-  private estimateUnitPrice(bondingCurve: BondingCurveAccount): number {
-    const virtualSolReserves = Number(bondingCurve.virtualSolReserves);
-    const virtualTokenReserves = Number(bondingCurve.virtualTokenReserves);
-
-    const pricePerToken =
-      virtualSolReserves /
-      (virtualTokenReserves / Math.pow(10, DEFAULT_DECIMALS));
-
-    return Math.min(this.MAX_UINT32, Math.ceil(pricePerToken));
-  }
-
-  private estimateUnitLimitForBuy(
-    bondingCurve: BondingCurveAccount,
-    solAmount: number,
-  ): number {
-    const virtualSolReserves = Number(bondingCurve.virtualSolReserves);
-    const virtualTokenReserves = Number(bondingCurve.virtualTokenReserves);
-
-    const lamportsToSpend = solAmount * LAMPORTS_PER_SOL;
-
-    const pricePerToken =
-      virtualSolReserves /
-      (virtualTokenReserves / Math.pow(10, DEFAULT_DECIMALS));
-
-    const expectedTokens = lamportsToSpend / pricePerToken;
-
-    // Apply a small buffer (e.g., 1%) to account for market movement during tx
-    const bufferMultiplier = 1.01;
-    const units = Math.ceil(
-      expectedTokens * bufferMultiplier * Math.pow(10, DEFAULT_DECIMALS),
-    );
-
-    return Math.min(units, this.MAX_UINT32);
-  }
-
-  private estimateUnitLimitForSell(uiAmount: number): number {
-    const rawUnits = uiAmount * Math.pow(10, DEFAULT_DECIMALS);
-
-    // Apply a 1-2% safety margin to avoid bonding curve shifts invalidating the tx
-    const bufferMultiplier = 0.98;
-
-    // Always round down — no ceiling allowed for safety
-    const adjustedUnits = Math.floor(rawUnits * bufferMultiplier);
-
-    // Prevent dust or low-value txs
-    const MIN_UNITS = 10;
-    if (adjustedUnits < MIN_UNITS) {
-      return 0;
-    }
-
-    return Math.min(adjustedUnits, this.MAX_UINT32);
   }
 
   private getLastTrade(): Trade | undefined {
