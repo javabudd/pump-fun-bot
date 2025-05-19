@@ -22,7 +22,7 @@ export default class CoinTrader {
   private readonly stopLossRatio = 0.95; // If price < 95% of buy price, sell (5% drop)
   private readonly takeProfitRatio = 1.1; // If price > 110% of buy price, take profit (10% gain)
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
-  private readonly positionAmount = 0.02;
+  private readonly positionAmount = 0.01;
   private readonly buySlippageBasisPoints = 1000n;
   private readonly sellSlippageBasisPoints = 2500n;
   private readonly maxPositionTime = 60; // max seconds to hold position
