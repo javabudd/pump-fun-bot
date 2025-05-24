@@ -1,15 +1,19 @@
 import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
-import { Keypair, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 
-import { PumpFunSDK } from "pumpdotfun-sdk";
+import {
+  BondingCurveAccount,
+  DEFAULT_DECIMALS,
+  PumpFunSDK,
+} from "pumpdotfun-sdk";
 import { logger } from "../logger";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 export default class CoinTrader {
   private trades: Array<Trade> = [];
   private isPlacingSale = false;
   private hasPosition = false;
-  private associatedUserAddress: PublicKey | null = null;
   private buyPrice: number | null = null;
   private buyTimestamp?: number; // Track when we bought
   private highestPriceSinceBuy: number | null = null;
@@ -18,13 +22,13 @@ export default class CoinTrader {
   private readonly stopLossRatio = 0.95; // If price < 95% of buy price, sell (5% drop)
   private readonly takeProfitRatio = 1.1; // If price > 110% of buy price, take profit (10% gain)
   private readonly trailingStopPercent = 0.05; // 5% drop from the peak triggers trailing stop sell
-  private readonly computeUnits = 250_000;
-  private readonly priorityFee = 150_000;
-  private readonly positionAmount = 0.025;
-  private readonly slippageBasisPoints = 300n;
-
+  private readonly positionAmount = 0.01;
+  private readonly buySlippageBasisPoints = 500n;
+  private readonly sellSlippageBasisPoints = 2500n;
+  private readonly maxPositionTime = 60; // max seconds to hold position
   private readonly blacklistedNameStrings = ["test"];
-  private readonly decimals = 9;
+  private readonly computeUnits = 200_000;
+  private readonly computeUnitPrice = 150_000;
 
   public constructor(
     private readonly pumpFun: PumpFunSDK,
@@ -42,7 +46,7 @@ export default class CoinTrader {
       !this.coin.is_banned &&
       !this.coin.hidden &&
       !this.isNameBlacklisted(this.coin.name) &&
-      (this.coin.twitter || this.coin.telegram || this.coin.is_currently_live)
+      (!!this.coin.twitter || !!this.coin.telegram || !!this.coin.website)
     ) {
       return this.buyTokens();
     } else {
@@ -50,21 +54,18 @@ export default class CoinTrader {
     }
   }
 
-  public async closeAccount(): Promise<string | undefined> {
-    if (!this.associatedUserAddress) {
-      return;
-    }
-
-    const account = await this.pumpFun.getBondingCurveAccount(
-      new PublicKey(this.coin.mint),
-    );
-
-    logger.info(`Bonding account to close: ${account}`);
-
-    // @TODO close account
+  public async closeAccount(): Promise<string> {
+    return this.coin.mint;
+    // return closeAccount(
+    //   this.pumpFun.connection,
+    //   this.buyerSellerKeypair,
+    //   new PublicKey(this.coin.mint),
+    //   this.buyerSellerKeypair.publicKey,
+    //   this.buyerSellerKeypair,
+    // );
   }
 
-  public async addTrade(trade: Trade): Promise<boolean | undefined> {
+  public addTrade(trade: Trade): void {
     if (trade.mint !== this.coin.mint) {
       return;
     }
@@ -73,143 +74,35 @@ export default class CoinTrader {
 
     if (trade.raydium_pool !== null) {
       logger.info(`Raydium reached for ${this.coin.name}!`);
-
-      return;
-    }
-
-    return this.attemptSniperSell(trade);
-  }
-
-  public async doSell() {
-    try {
-      this.isPlacingSale = true;
-      const sold = await this.sellTokens();
-      if (sold) {
-        logger.info("Position closed successfully.");
-      } else {
-        logger.info("Sell attempt failed.");
-      }
-      this.isPlacingSale = false;
-      this.hasPosition = false;
-      this.highestPriceSinceBuy = null;
-      this.trailingStopMode = false;
-      this.buyTimestamp = undefined;
-      this.buyPrice = null;
-
-      return sold;
-    } catch (error) {
-      logger.error("Error while attempting to sell:", error);
-      return false;
     }
   }
 
-  private async buyTokens(): Promise<boolean> {
-    const url = `https://pump.fun/coin/${this.coin.mint}`;
-    const isMockString = this.asMock ? " mock " : " ";
-    logger.attemptBuy(
-      `Executing${isMockString}buy for ${this.coin.name} at ${url}...`,
-    );
-
-    if (this.asMock) {
-      this.setBuyProperties();
-
-      return true;
-    }
-
-    const mintPublicKey = new PublicKey(this.coin.mint);
-
-    await this.waitForBondingCurve(mintPublicKey);
-
-    let buyResults;
-    try {
-      buyResults = await this.pumpFun.buy(
-        this.buyerSellerKeypair,
-        mintPublicKey,
-        BigInt(this.positionAmount * LAMPORTS_PER_SOL),
-        this.slippageBasisPoints,
-        {
-          unitLimit: this.computeUnits,
-          unitPrice: this.priorityFee,
-        },
-        "processed",
-        "finalized",
-      );
-    } catch (error) {
-      logger.error(`Error while attempting to buy: ${error}`);
-
-      return false;
-    }
-
-    if (buyResults.success) {
-      logger.buy(
-        `Buy transaction successful: ${buyResults.results?.transaction.message}`,
-      );
-
-      this.setBuyProperties();
-
-      return true;
-    } else {
-      logger.error(`Buy failed: ${buyResults.error || "Unknown error"}`);
-
-      return false;
-    }
-  }
-
-  private async sellTokens(): Promise<boolean> {
-    if (this.asMock) {
-      logger.attemptSell("Executing mock sell...");
-
-      return true;
-    }
-
-    const mintPublicKey = new PublicKey(this.coin.mint);
-
-    if (this.positionAmount) {
-      const sellResults = await this.pumpFun.sell(
-        this.buyerSellerKeypair,
-        mintPublicKey,
-        BigInt(this.positionAmount * LAMPORTS_PER_SOL),
-        this.slippageBasisPoints,
-        {
-          unitLimit: this.computeUnits,
-          unitPrice: this.priorityFee,
-        },
-        "confirmed",
-      );
-
-      if (sellResults.success) {
-        logger.sell(
-          `Sell transaction successful: ${sellResults.results?.transaction.message}`,
-        );
-
-        return true;
-      } else {
-        logger.error("Sell failed");
-
-        return false;
-      }
-    }
-
-    logger.error("No position to sell");
-
-    return false;
-  }
-
-  private async attemptSniperSell(trade: Trade): Promise<boolean | undefined> {
+  public async attemptSniperSell(): Promise<boolean | undefined> {
     if (
       !this.hasPosition ||
       this.isPlacingSale ||
       !this.buyTimestamp ||
-      !this.buyPrice ||
-      trade.user === this.pumpFun.program.provider.publicKey?.toBase58()
+      !this.buyPrice
     ) {
+      return;
+    }
+
+    if (Date.now() - this.buyTimestamp >= this.maxPositionTime * 1000) {
+      logger.warn("Position held to its maximum time, selling...");
+
+      return this.doSell();
+    }
+
+    const trade = this.getLastTrade();
+
+    if (!trade) {
       return;
     }
 
     const currentPrice =
       (trade.sol_amount + trade.virtual_sol_reserves) /
       ((trade.token_amount + trade.virtual_token_reserves) /
-        Math.pow(10, this.decimals));
+        Math.pow(10, DEFAULT_DECIMALS));
 
     if (!currentPrice) {
       logger.warn("No current price available, skipping stop-loss check.");
@@ -271,6 +164,127 @@ export default class CoinTrader {
     return this.doSell();
   }
 
+  public async doSell() {
+    this.isPlacingSale = true;
+
+    let sold;
+    try {
+      sold = await this.sellTokens();
+    } catch (error) {
+      logger.error(`Error while attempting to sell: ${error}`);
+
+      this.isPlacingSale = false;
+
+      return false;
+    }
+
+    if (sold) {
+      logger.info("Position closed successfully.");
+    } else {
+      logger.info("Sell attempt failed.");
+    }
+
+    this.isPlacingSale = false;
+    this.hasPosition = false;
+    this.highestPriceSinceBuy = null;
+    this.trailingStopMode = false;
+    this.buyTimestamp = undefined;
+    this.buyPrice = null;
+
+    return sold;
+  }
+
+  private async buyTokens(): Promise<boolean> {
+    const url = `https://pump.fun/coin/${this.coin.mint}`;
+    const isMockString = this.asMock ? " mock " : " ";
+    logger.attemptBuy(
+      `Executing${isMockString}buy for ${this.coin.name} at ${url}...`,
+    );
+
+    if (this.asMock) {
+      this.setBuyProperties();
+
+      return true;
+    }
+
+    const mintPublicKey = new PublicKey(this.coin.mint);
+
+    await this.waitForBondingCurve(mintPublicKey);
+
+    let buyResults;
+    try {
+      buyResults = await this.pumpFun.buy(
+        this.buyerSellerKeypair,
+        mintPublicKey,
+        BigInt(this.positionAmount * LAMPORTS_PER_SOL),
+        this.buySlippageBasisPoints,
+        {
+          unitLimit: this.computeUnits,
+          unitPrice: this.computeUnitPrice,
+        },
+        "processed",
+        "confirmed",
+      );
+    } catch (error) {
+      logger.error(`Error while attempting to buy: ${error}`);
+
+      return false;
+    }
+
+    logger.buy(`Buy transaction successful: ${buyResults.results?.blockTime}`);
+
+    this.setBuyProperties();
+
+    return true;
+  }
+
+  private async sellTokens(): Promise<boolean> {
+    if (this.asMock) {
+      logger.attemptSell("Executing mock sell...");
+
+      return true;
+    }
+
+    const mintPublicKey = new PublicKey(this.coin.mint);
+
+    await this.waitForBondingCurve(mintPublicKey);
+
+    const currentSPLBalance = await this.getSPLBalance(mintPublicKey);
+    if (currentSPLBalance === null) {
+      logger.error("Balance empty...");
+
+      return false;
+    }
+
+    logger.info(`Selling ${currentSPLBalance} ${this.coin.name}`);
+
+    let sellResults;
+    try {
+      sellResults = await this.pumpFun.sell(
+        this.buyerSellerKeypair,
+        mintPublicKey,
+        BigInt(currentSPLBalance),
+        this.sellSlippageBasisPoints,
+        {
+          unitLimit: this.computeUnits,
+          unitPrice: this.computeUnitPrice,
+        },
+        "processed",
+        "confirmed",
+      );
+    } catch (error) {
+      logger.error(`Error while attempting to sell: ${error}`);
+
+      return false;
+    }
+
+    logger.sell(
+      `Sell transaction successful: ${sellResults.results?.blockTime}`,
+    );
+
+    return true;
+  }
+
   private checkPumpEndingSignal(): boolean {
     // Return true if external conditions indicate the pump is ending
     return false;
@@ -291,17 +305,24 @@ export default class CoinTrader {
   }
 
   private setBuyProperties(): void {
+    let virtualSolReserves = this.coin.virtual_sol_reserves;
+    let virtualTokenReserves = this.coin.virtual_token_reserves;
+    const lastTrade = this.getLastTrade();
+    if (lastTrade) {
+      virtualSolReserves = lastTrade.virtual_sol_reserves;
+      virtualTokenReserves = lastTrade.virtual_token_reserves;
+    }
+
     const estimatedSolReserves =
-      this.coin.virtual_sol_reserves + Math.abs(this.positionAmount);
+      virtualSolReserves + Math.abs(this.positionAmount);
     const tokenOutflow =
-      this.positionAmount *
-      (this.coin.virtual_token_reserves / this.coin.virtual_sol_reserves);
+      this.positionAmount * (virtualTokenReserves / virtualSolReserves);
     const estimatedTokenReserves =
-      this.coin.virtual_token_reserves - Math.abs(tokenOutflow);
+      virtualTokenReserves - Math.abs(tokenOutflow);
 
     this.buyPrice =
       estimatedSolReserves /
-      (estimatedTokenReserves / Math.pow(10, this.decimals));
+      (estimatedTokenReserves / Math.pow(10, DEFAULT_DECIMALS));
 
     this.hasPosition = true;
     this.buyTimestamp = Date.now();
@@ -310,9 +331,9 @@ export default class CoinTrader {
 
   private async waitForBondingCurve(
     mint: PublicKey,
-    maxRetries = 15,
+    maxRetries = 7,
     baseDelayMs = 500,
-  ) {
+  ): Promise<BondingCurveAccount> {
     for (let i = 0; i < maxRetries; i++) {
       try {
         const bondingCurve = await this.pumpFun.getBondingCurveAccount(
@@ -331,5 +352,30 @@ export default class CoinTrader {
     }
 
     throw new Error("Bonding curve account not found after retries");
+  }
+
+  private async getSPLBalance(
+    mintAddress: PublicKey,
+    allowOffCurve: boolean = false,
+  ): Promise<number | null> {
+    try {
+      const ata = getAssociatedTokenAddressSync(
+        mintAddress,
+        this.buyerSellerKeypair.publicKey,
+        allowOffCurve,
+      );
+      const balance = await this.pumpFun.connection.getTokenAccountBalance(
+        ata,
+        "processed",
+      );
+      return parseInt(balance.value.amount);
+    } catch (e) {
+      logger.error(`Failed retrieving balance ${e}`);
+    }
+    return null;
+  }
+
+  private getLastTrade(): Trade | undefined {
+    return this.trades[this.trades.length - 1];
   }
 }
