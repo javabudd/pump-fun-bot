@@ -4,8 +4,11 @@
 # Outputs
 dist
 
-# Depss
+# Deps
 node_modules
 
 # Environmenet variables
 .env
+
+# Other
+.DS_Store
