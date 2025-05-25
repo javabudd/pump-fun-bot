@@ -31,9 +31,14 @@ export default class CoinMonitor {
     socket.on(`tradeCreated`, async (data) => {
       const trade: Trade = data;
 
-      if (trade.usd_market_cap > 20000 && trade.is_buy && !!trade.twitter) {
+      if (
+        trade.usd_market_cap > 30000 &&
+        trade.is_buy &&
+        !!trade.twitter &&
+        trade.sol_amount > 20
+      ) {
         const url = `https://pump.fun/coin/${trade.mint}`;
-        logger.info(`Big trade found! ${url}`);
+        logger.info(`Big trade found: ${trade.name} - ${url}`);
       }
     });
   }
