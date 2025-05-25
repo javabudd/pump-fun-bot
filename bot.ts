@@ -1,25 +1,24 @@
 import { connect, NatsConnection, StringCodec, Subscription } from "nats.ws";
 import { WebSocket } from "ws";
 import CoinMonitor from "./lib/coin-monitor";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
-import { AnchorProvider, Program, Wallet } from "@project-serum/anchor";
-import idl from "./idl.json";
-import { PumpFun } from "./types/pump-fun";
+import { Connection, Keypair } from "@solana/web3.js";
+import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import { logger } from "./logger";
+import { PumpFunSDK } from "pumpdotfun-sdk";
 
 process.loadEnvFile(".env");
 
 // @ts-expect-error it's global
 (globalThis as unknown).WebSocket = WebSocket;
 
-type GlobalAccount = {
-  feeRecipient: PublicKey;
-  authority: PublicKey;
+const getKeypair = (): Keypair => {
+  const key = process.env.SOL_PRIVATE_KEY ?? "";
+  const privateKeyArray = Uint8Array.from(key.split(",").map(Number));
+
+  return Keypair.fromSecretKey(privateKeyArray);
 };
 
-(async function main(): Promise<void> {
-  const url: string = "wss://prod-v2.nats.realtime.pump.fun/";
-
+const getProvider = () => {
   let walletUrl: string = "https://api.mainnet-beta.solana.com";
   let websocketUrl = "wss://api.mainnet-beta.solana.com";
 
@@ -31,9 +30,6 @@ type GlobalAccount = {
     websocketUrl = process.env.WALLET_WEBSOCKET_URL;
   }
 
-  const programId = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
-  const sc = StringCodec();
-
   let connection, keypair;
 
   try {
@@ -42,10 +38,7 @@ type GlobalAccount = {
       wsEndpoint: websocketUrl,
     });
 
-    const key = process.env.SOL_PRIVATE_KEY ?? "";
-    const privateKeyArray = Uint8Array.from(key.split(",").map(Number));
-
-    keypair = Keypair.fromSecretKey(privateKeyArray);
+    keypair = getKeypair();
   } catch (err) {
     logger.error("Error loading Solana wallet:", err);
 
@@ -53,41 +46,24 @@ type GlobalAccount = {
   }
 
   const wallet = new Wallet(keypair);
-  const provider = new AnchorProvider(connection, wallet, {
-    commitment: "confirmed",
-  });
 
-  // @ts-expect-error ignore idl spec for now
-  const anchorProgram = new Program(idl, programId, provider);
+  return new AnchorProvider(connection, wallet, { commitment: "finalized" });
+};
 
-  const [globalPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("global")],
-    anchorProgram.programId,
-  );
+(async function main(): Promise<void> {
+  const provider = getProvider();
 
-  const globalAccount = (await anchorProgram.account.global.fetch(
-    globalPDA,
-  )) as unknown as GlobalAccount;
-
-  if (!globalAccount) {
-    logger.error("No global account found!");
-
-    return;
+  if (provider === undefined || provider === null) {
+    throw new Error("Failed to load Solana wallet");
   }
 
-  const pumpFun: PumpFun = {
-    global: {
-      feeRecipient: globalAccount.feeRecipient,
-      pda: globalPDA,
-      eventAuthority: globalAccount.authority,
-    },
-    connection,
-    keypair,
-    anchorProgram,
-  };
+  const pumpFunSdk = new PumpFunSDK(provider);
+  const url: string = "wss://prod-v2.nats.realtime.pump.fun/";
+  const sc = StringCodec();
 
   const monitor = new CoinMonitor(
-    pumpFun,
+    pumpFunSdk,
+    getKeypair(),
     1,
     process.env["AS_MOCK"] === "true",
   );

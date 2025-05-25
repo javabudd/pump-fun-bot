@@ -2,13 +2,14 @@
 
 ## Requirements
 
-* node==23 (`nvm use`)
+* node==23
 * npm
 
 ## Building
 
+* copy `.env.dist` to `.env` and set variables
+* `nvm use`
 * `npm i`
-* `npm run build`
 
 ## Running
 

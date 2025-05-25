@@ -1,22 +1,18 @@
 {
   "name": "pump.fun.bot",
   "scripts": {
-    "build": "npx tsc",
-    "bot": "node dist/bot.js",
-    "close": "node dist/close.js",
-    "go": "npm run build && npm run run"
+    "bot": "npx ts-node bot.ts",
+    "close": "npx ts-node close.ts"
   },
   "engines": {
     "node": ">=23 <24"
   },
   "dependencies": {
-    "@project-serum/anchor": "^0.26.0",
-    "@solana/spl-token": "^0.4.13",
-    "@solana/web3.js": "^1.98.2",
     "axios": "^1.9.0",
     "nats.ws": "^1.30.3",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",
+    "pumpdotfun-sdk": "^1.4.2",
     "socket.io-client": "^4.8.1",
     "ws": "^8.18.2"
   },
@@ -29,6 +25,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.4.0",
     "globals": "^15.15.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.32.1"
   }

@@ -2,8 +2,9 @@ import { io } from "socket.io-client";
 import CoinTrader from "./coin-trader";
 import { Coin } from "../types/coin";
 import { Trade } from "../types/trade";
-import { PumpFun } from "../types/pump-fun";
 import { logger } from "../logger";
+import { PumpFunSDK } from "pumpdotfun-sdk";
+import { Keypair } from "@solana/web3.js";
 
 export default class CoinMonitor {
   private readonly pumpFunSocketIoUrl = "https://frontend-api-v3.pump.fun";
@@ -11,7 +12,8 @@ export default class CoinMonitor {
   private monitoredCoins: Record<string, Coin> = {};
 
   public constructor(
-    private readonly pumpFun: PumpFun,
+    private readonly pumpFun: PumpFunSDK,
+    private readonly buyerSellerKeypair: Keypair,
     private readonly maximumMonitoredCoins = 1,
     private readonly asMock = false,
   ) {
@@ -40,6 +42,7 @@ export default class CoinMonitor {
   public subscribeToCoinTrades(coin: Coin): void {
     let trader: CoinTrader | null = new CoinTrader(
       this.pumpFun,
+      this.buyerSellerKeypair,
       coin,
       this.asMock,
     );
@@ -47,6 +50,16 @@ export default class CoinMonitor {
     const socket = io(this.pumpFunSocketIoUrl, {
       path: "/socket.io/",
       transports: ["websocket"],
+    });
+
+    socket.on(`tradeCreated:${coin.mint}`, async (data) => {
+      if (!trader) {
+        return;
+      }
+
+      const trade: Trade = data;
+
+      trader.addTrade(trade);
     });
 
     socket.on("connect", async () => {
@@ -60,38 +73,37 @@ export default class CoinMonitor {
 
       if (!started) {
         socket.disconnect();
+        return;
       }
 
-      setTimeout(async () => {
-        try {
-          await trader?.doSell();
-        } catch (error) {
-          logger.error("Error while attempting to sell after timeout:", error);
-        }
-        socket.disconnect();
-      }, 60000);
+      const attemptSellLoop = async () => {
+        if (!trader) return;
 
-      socket.on(`tradeCreated:${coin.mint}`, async (data) => {
-        if (!trader) {
+        const tradeResult = await trader.attemptSniperSell();
+
+        if (tradeResult === true) {
+          socket.disconnect();
           return;
         }
 
-        const trade: Trade = data;
-        const tradeResult = await trader.addTrade(trade);
+        setTimeout(attemptSellLoop, 1000);
+      };
 
-        if (!trader || tradeResult !== undefined) {
-          socket.disconnect();
-        }
-      });
+      attemptSellLoop();
     });
 
     socket.on("disconnect", async () => {
       if (trader) {
-        trader.closeAccount().then((accountId) => {
-          if (accountId) {
-            logger.info(`Closed account for ${accountId}`);
-          }
-        });
+        trader
+          .closeAccount()
+          .then((accountId) => {
+            if (accountId) {
+              logger.info(`Closed account for ${accountId}`);
+            }
+          })
+          .catch((e) => {
+            logger.error(`Error closing account: ${e}`);
+          });
       }
 
       delete this.monitoredCoins[coin.mint];
