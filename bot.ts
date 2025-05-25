@@ -65,7 +65,7 @@ const getProvider = () => {
     pumpFunSdk,
     getKeypair(),
     1,
-    process.env["AS_MOCK"] === "true",
+    process.env["AS_MOCK"]?.toLowerCase() === "true",
   );
 
   try {
