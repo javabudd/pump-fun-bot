@@ -12,8 +12,8 @@ export default class CoinMonitor {
   private monitoredCoins: Record<string, Coin> = {};
 
   public constructor(
-    private readonly pumpFun: PumpFunSDK,
-    private readonly buyerSellerKeypair: Keypair,
+    private readonly pumpFun?: PumpFunSDK,
+    private readonly buyerSellerKeypair?: Keypair,
     private readonly maximumMonitoredCoins = 1,
     private readonly asMock = false,
   ) {
@@ -61,6 +61,16 @@ export default class CoinMonitor {
   }
 
   private subscribeToCoinTrades(coin: Coin): void {
+    if (this.pumpFun === undefined) {
+      throw new Error("Cannot subscribe to coin trades without a pump.fun SDK");
+    }
+
+    if (this.buyerSellerKeypair === undefined) {
+      throw new Error(
+        "Cannot subscribe to coin trades without a buyer/seller keypair",
+      );
+    }
+
     let trader: CoinTrader | null = new CoinTrader(
       this.pumpFun,
       this.buyerSellerKeypair,
