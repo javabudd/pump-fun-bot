@@ -22,6 +22,22 @@ export default class CoinMonitor {
     this.asMock = asMock;
   }
 
+  public startScanner(): void {
+    const socket = io(this.pumpFunSocketIoUrl, {
+      path: "/socket.io/",
+      transports: ["websocket"],
+    });
+
+    socket.on(`tradeCreated`, async (data) => {
+      const trade: Trade = data;
+
+      if (trade.usd_market_cap > 20000 && trade.is_buy) {
+        const url = `https://pump.fun/coin/${trade.mint}`;
+        logger.info(`Big trade found! ${url}`);
+      }
+    });
+  }
+
   public startCoinMonitor(newToken: Coin): void {
     if (this.monitoredCoins[newToken.mint]) {
       return;
@@ -39,7 +55,7 @@ export default class CoinMonitor {
     this.subscribeToCoinTrades(newToken);
   }
 
-  public subscribeToCoinTrades(coin: Coin): void {
+  private subscribeToCoinTrades(coin: Coin): void {
     let trader: CoinTrader | null = new CoinTrader(
       this.pumpFun,
       this.buyerSellerKeypair,
