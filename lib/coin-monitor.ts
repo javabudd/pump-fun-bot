@@ -50,6 +50,7 @@ export default class CoinMonitor {
         trade.usd_market_cap >= scannerOptions.marketCap &&
         trade.is_buy &&
         solAmount >= scannerOptions.solAmount &&
+        trade.user !== trade.creator &&
         scannerOptions.socialConditionals({
           twitter: trade.twitter,
           telegram: trade.telegram,
