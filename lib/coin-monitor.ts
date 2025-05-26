@@ -42,11 +42,12 @@ export default class CoinMonitor {
 
     socket.on(`tradeCreated`, async (data) => {
       const trade: Trade = data;
+      const solAmount = trade.sol_amount / 1000000000;
 
       if (
-        trade.usd_market_cap > scannerOptions.marketCap &&
+        trade.usd_market_cap >= scannerOptions.marketCap &&
         trade.is_buy &&
-        trade.sol_amount > scannerOptions.solAmount &&
+        solAmount >= scannerOptions.solAmount &&
         scannerOptions.socialConditionals({
           twitter: trade.twitter,
           telegram: trade.telegram,
