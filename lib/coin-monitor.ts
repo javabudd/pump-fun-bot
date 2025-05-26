@@ -59,9 +59,7 @@ export default class CoinMonitor {
         const url = `https://pump.fun/coin/${trade.mint}`;
         logger.info(`Big trade found: ${trade.name} - ${url}`);
 
-        if (this.notificationClient) {
-          this.notificationClient.send(trade);
-        }
+        this.notificationClient?.send(trade);
       }
     });
   }
