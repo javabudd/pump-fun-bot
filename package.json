@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "axios": "^1.9.0",
+    "commander": "^14.0.0",
     "nats.ws": "^1.30.3",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",

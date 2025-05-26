@@ -6,6 +6,18 @@ import { logger } from "../logger";
 import { PumpFunSDK } from "pumpdotfun-sdk";
 import { Keypair } from "@solana/web3.js";
 
+export type SocialOptions = {
+  twitter: string | null;
+  telegram: string | null;
+  website: string | null;
+};
+
+export type ScannerOptions = {
+  marketCap: number;
+  solAmount: number;
+  socialConditionals: (socialOptions: SocialOptions) => boolean;
+};
+
 export default class CoinMonitor {
   private readonly pumpFunSocketIoUrl = "https://frontend-api-v3.pump.fun";
 
@@ -22,7 +34,7 @@ export default class CoinMonitor {
     this.asMock = asMock;
   }
 
-  public startScanner(): void {
+  public startScanner(scannerOptions: ScannerOptions): void {
     const socket = io(this.pumpFunSocketIoUrl, {
       path: "/socket.io/",
       transports: ["websocket"],
@@ -32,10 +44,14 @@ export default class CoinMonitor {
       const trade: Trade = data;
 
       if (
-        trade.usd_market_cap > 30000 &&
+        trade.usd_market_cap > scannerOptions.marketCap &&
         trade.is_buy &&
-        !!trade.twitter &&
-        trade.sol_amount > 20
+        trade.sol_amount > scannerOptions.solAmount &&
+        scannerOptions.socialConditionals({
+          twitter: trade.twitter,
+          telegram: trade.telegram,
+          website: trade.website,
+        })
       ) {
         const url = `https://pump.fun/coin/${trade.mint}`;
         logger.info(`Big trade found: ${trade.name} - ${url}`);
