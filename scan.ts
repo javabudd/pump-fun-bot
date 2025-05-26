@@ -8,7 +8,6 @@ program.parse();
 
 (async function main(): Promise<void> {
   const options = program.opts();
-  console.log(options);
 
   const monitor = new CoinMonitor(
     undefined,
