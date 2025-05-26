@@ -5,6 +5,7 @@ import { Trade } from "../types/trade";
 import { logger } from "../logger";
 import { PumpFunSDK } from "pumpdotfun-sdk";
 import { Keypair } from "@solana/web3.js";
+import { NotificationClient } from "./notifications";
 
 export type SocialOptions = {
   twitter: string | null;
@@ -28,6 +29,7 @@ export default class CoinMonitor {
     private readonly buyerSellerKeypair?: Keypair,
     private readonly maximumMonitoredCoins = 1,
     private readonly asMock = false,
+    private readonly notificationClient?: NotificationClient,
   ) {
     this.pumpFun = pumpFun;
     this.maximumMonitoredCoins = maximumMonitoredCoins;
@@ -56,6 +58,10 @@ export default class CoinMonitor {
       ) {
         const url = `https://pump.fun/coin/${trade.mint}`;
         logger.info(`Big trade found: ${trade.name} - ${url}`);
+
+        if (this.notificationClient) {
+          this.notificationClient.send(trade);
+        }
       }
     });
   }
